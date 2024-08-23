@@ -1,5 +1,6 @@
 # KiiGuardian
 
+![Kiiguardian logo](./KiiGuardian.png)
 
 ## How It Works
 
@@ -25,3 +26,4 @@ The entire backend of the application is developed in **Python**, utilizing **et
 
 
 ## infrastructure
+![Infrastructure logic](./infrastructure.jpg)
