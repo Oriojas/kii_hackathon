@@ -1,42 +1,59 @@
-from substrateinterface import SubstrateInterface
+from kiipy.aerial.client import LedgerClient, NetworkConfig
 
+class GetBalance:
+    """
+    A class used to interact with a blockchain ledger to get a wallet's balance.
 
-class getBalance:
+    Attributes
+    ----------
+    ledger_client : LedgerClient
+        An instance of LedgerClient for interacting with the blockchain ledger.
+
+    Methods
+    -------
+    __init__()
+        Initializes the getBalance class and sets up the ledger_client attribute.
+
+    fit(wallet)
+        Retrieves the balance of a given wallet.
+
+    """
 
     def __init__(self):
         """
-        this function get balance a wallet public key
+        Initializes the getBalance class and sets up the ledger_client attribute.
+
+        Tries to establish a connection to the blockchain ledger using LedgerClient and NetworkConfig.
+        If a ConnectionRefusedError occurs, it prints a warning message and exits the program.
+
         """
-
         try:
-            self.substrate = SubstrateInterface(
-                url="wss://mandala-rpc.aca-staging.network/ws",
-                ss58_format=42
-                )
-
-            print("😀 node running")
-            self.l_n = self.substrate.get_chain_head()
-
+            self.ledger_client = LedgerClient(NetworkConfig.kii_testnet())
+            print("😀 chain running")
         except ConnectionRefusedError:
-            print("⚠️ No local Substrate node running, try running 'start_local_substrate_node.sh' first")
+            print("⚠️ No connection blockchain")
             exit()
 
     def fit(self, wallet):
         """
-        this function return the balance wallet
-        :param wallet:
-        :return:
+        Retrieves the balance of a given wallet.
+
+        Parameters
+        ----------
+        wallet : str
+            The wallet address for which to retrieve the balance.
+
+        Returns
+        -------
+        balance_off : int
+            The balance of the given wallet.
+
         """
-
-        ln = self.l_n
-        result = self.substrate.query(
-            module='System',
-            storage_function='Account',
-            params=[wallet]
-        )
-
-        balance_off = int(result.value['data']['free'] / 10 ** 8) / 10000
-
+        balance_off = self.ledger_client.get_balance(wallet)
         print(balance_off)
+        return balance_off
 
-        return balance_off, ln
+if __name__ == '__main__':
+    balance_obj = GetBalance()
+    balance_off = balance_obj.fit(wallet='0x1d870f1210e66cba98093682b84d4491Ec04141b')
+    print(f'Balance: {balance_off}')

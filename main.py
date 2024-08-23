@@ -4,7 +4,7 @@ import pymysql
 import uvicorn
 import pandas as pd
 from send_tk import sendTk
-from get_balance import getBalance
+from get_balance import GetBalance
 from plot import plotSensor
 from maps import plotGps
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -37,9 +37,9 @@ async def home(request: Request):
     :return:
     """
 
-    bal_obj = getBalance()
-    w_1, _ = bal_obj.fit(wallet=WALLET1)
-    w_2, ln = bal_obj.fit(wallet=WALLET2)
+    bal_obj = GetBalance()
+    w_1 = bal_obj.fit(wallet=WALLET1)
+    w_2 = bal_obj.fit(wallet=WALLET2)
 
     plotSensor().plot(wallet_1=w_1, wallet_2=w_2)
     print(f'Plot OK!')
@@ -56,7 +56,6 @@ async def home(request: Request):
         "request": request,
         "plot": str(plot[0]),
         "plot2": str(plot2[0]),
-        'ln': ln
     })
 
 
@@ -68,7 +67,7 @@ async def balance(wallet_balance: str):
     :return: balance_off
     """
 
-    bal_obj = getBalance()
+    bal_obj = GetBalance()
 
     balance_off = bal_obj.fit(wallet=wallet_balance)
 
