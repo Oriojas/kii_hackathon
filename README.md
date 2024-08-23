@@ -25,5 +25,5 @@ The microcontroller chosen for this project is the **ESP32**, selected for its l
 The entire backend of the application is developed in **Python**, utilizing **ether.js** for blockchain connectivity. **FastAPI** is used to create the endpoints, while the frontend is built with **Bootstrap**. The **KiiChain testnet** was used for testing purposes.
 
 
-## infrastructure
+## Infrastructure
 ![Infrastructure logic](./infrastructure.jpg)
