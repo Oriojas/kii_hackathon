@@ -19,6 +19,8 @@
 
 The microcontroller chosen for this project is the **ESP32**, selected for its low power consumption and built-in Wi-Fi connectivity. To measure CO2 levels, an **MQ135 sensor** is connected to one of the analog inputs of the ESP32.
 
+![Kiiguardian logo](./img/sensor.jpg)
+
 
 ## Software
 
