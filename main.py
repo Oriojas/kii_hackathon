@@ -209,6 +209,5 @@ async def query_co2(rows: int, token: str):
 
     return JSONResponse(content=json_data)
 
-
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8086)
