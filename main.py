@@ -3,7 +3,7 @@ import json
 import pymysql
 import uvicorn
 import pandas as pd
-from send_tk import sendTk
+from send_tk import SendTk
 from get_balance import GetBalance
 from plot import plotSensor
 from maps import plotGps

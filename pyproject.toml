@@ -12,6 +12,7 @@ web3 = "^6.20.2"
 pymysql = "^1.1.1"
 uvicorn = "^0.30.6"
 pandas = "^2.2.2"
+python-dotenv = "^1.0.1"
 
 
 [build-system]
