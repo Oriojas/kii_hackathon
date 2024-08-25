@@ -25,17 +25,12 @@ USERNAME = os.environ["USERNAME"]
 PASSWORD = os.environ["PASSWORD"]
 DRIVER = os.environ["DRIVER"]
 TOKEN = os.environ["TOKEN"]
-WALLET1 = os.environ["WALLET1"]
-WALLET2 = os.environ["WALLET2"]
+WALLET1 = os.environ["MAIN_WALLET"]
+WALLET2 = os.environ["SEND_WALLET"]
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """
-    this function render front
-    :param request:
-    :return:
-    """
 
     bal_obj = GetBalance()
     w_1 = bal_obj.fit(wallet=WALLET1)
@@ -61,11 +56,6 @@ async def home(request: Request):
 
 @app.get('/balance/')
 async def balance(wallet_balance: str):
-    """
-    this function get balance a wallet
-    :param wallet_balance: wallet to gert balance
-    :return: balance_off
-    """
 
     bal_obj = GetBalance()
 
@@ -76,15 +66,10 @@ async def balance(wallet_balance: str):
 
 @app.get('/send/')
 async def send(wallet_send: str, token: str):
-    """
-    this function send token from main account to any wallet
-    :param token:
-    :param wallet_send: wallet destination
-    :return: if transaction is ok True
-    """
+
     if token == TOKEN:
         amount = 0.1
-        tx = sendTk().send(wallet_to_send=wallet_send, amount=amount)
+        tx = SendTk().send(wallet_to_send=wallet_send, amount=amount)
         print(f'Tx is: {tx}')
     else:
         print(f'Not valid token {token}')
@@ -95,15 +80,6 @@ async def send(wallet_send: str, token: str):
 
 @app.get('/data_co_send_tokens/')
 async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon: float):
-    """
-    this function send data to database and send token if co2 value up 800 ppm
-    :param co2: int, value of ppm co2
-    :param origin: str, is origin of data test or sensor
-    :param token: uuid for endpoint
-    :param lat: float, latitude from sensor
-    :param lon: float, longitude from sensor
-    :return: None
-    """
 
     with open('data_user.json') as f:
         data_user = json.load(f)
@@ -116,7 +92,7 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
     print(f"ppm co2: {co2} , origen: {origin}, lat: {lat}, lon: {lon}")
 
     if token == TOKEN:
-        # insert data in db
+
         with pymysql.connect(host=SERVER,
                              port=3306,
                              user=USERNAME,
@@ -130,7 +106,7 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
 
         if data_points == 9:
             amount = 0.5
-            tx = sendTk().send(wallet_to_send=WALLET2, amount=amount)
+            tx = SendTk().send(wallet_to_send=WALLET2, amount=amount)
             if tx:
                 print(f'🤑 send {amount} to {WALLET2} is: {tx}')
                 print(f'👌 data send sensor ok and co2 ok')
@@ -164,22 +140,12 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
 
 @app.get('/data_co_send/')
 async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float):
-    """
-    this function send data to database and send token if co2 value up 800 ppm
-    :param co2: int, value of ppm co2
-    :param origin: str, is origin of data test or sensor
-    :param lat: float, latitude from sensor
-    :param lon: float, longitude from sensor
-    :param token: uuid for endpoint
-    :return: None
-    """
 
     print(''.center(60, '='))
     print(f"ppm co2: {co2} , origen: {origin}, lat: {lat}, lon: {lon}")
 
     if token == TOKEN:
 
-        # insert data in db
         with pymysql.connect(host=SERVER,
                              port=3306,
                              user=USERNAME,
@@ -199,12 +165,6 @@ async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float
 
 @app.get('/query_co2/')
 async def query_co2(rows: int, token: str):
-    """
-    this function test database
-    :param rows: number of rows to query
-    :param token: uuid for endpoint
-    :return: json with rows in rows param
-    """
     if token == TOKEN:
 
         with pymysql.connect(host=SERVER,
