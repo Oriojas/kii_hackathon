@@ -7,11 +7,15 @@ from send_tk import SendTk
 from get_balance import GetBalance
 from plot import plotSensor
 from maps import plotGps
+from dotenv import load_dotenv
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sshtunnel import SSHTunnelForwarder
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -19,22 +23,26 @@ app.mount("/css", StaticFiles(directory="css"), name="css")
 app.mount("/img", StaticFiles(directory="img"), name="img")
 templates = Jinja2Templates(directory="templates")
 
-SERVER = os.environ["SERVER"]
-DATABASE = os.environ["DATABASE"]
-USERNAME = os.environ["USERNAME"]
-PASSWORD = os.environ["PASSWORD"]
-DRIVER = os.environ["DRIVER"]
-TOKEN = os.environ["TOKEN"]
-WALLET1 = os.environ["MAIN_WALLET"]
-WALLET2 = os.environ["SEND_WALLET"]
+SSH_HOST = os.environ.get('SSH_HOST')
+SSH_PORT = int(os.environ.get('SSH_PORT'))
+SSH_USER = os.environ.get('SSH_USER')
+SSH_KEY_PATH = os.environ.get('SSH_KEY_PATH')
+DB_HOST = os.environ.get('DB_HOST')
+DB_PORT = int(os.environ.get('DB_PORT'))
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_NAME = os.environ.get('DB_NAME')
+TOKEN = os.environ.get('TOKEN')
+MAIN_WALLET = os.environ.get('MAIN_WALLET')
+SEND_WALLET = os.environ.get('SEND_WALLET')
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
 
     bal_obj = GetBalance()
-    w_1 = bal_obj.fit(wallet=WALLET1)
-    w_2 = bal_obj.fit(wallet=WALLET2)
+    w_1 = bal_obj.fit(wallet=MAIN_WALLET)
+    w_2 = bal_obj.fit(wallet=SEND_WALLET)
 
     plotSensor().plot(wallet_1=w_1, wallet_2=w_2)
     print(f'Plot OK!')
@@ -93,22 +101,27 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
 
     if token == TOKEN:
 
-        with pymysql.connect(host=SERVER,
-                             port=3306,
-                             user=USERNAME,
-                             passwd=PASSWORD,
-                             database=DATABASE) as conn:
+        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
+                                ssh_username=SSH_USER,
+                                ssh_password=SSH_KEY_PATH,
+                                remote_bind_address=(DB_HOST, DB_PORT),
+                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
+            conn = pymysql.connect(host='127.0.0.1',
+                                   port=tunnel.local_bind_port,
+                                   user=DB_USER,
+                                   password=DB_PASSWORD,
+                                   db=DB_NAME)
             with conn.cursor() as cursor:
                 count = cursor.execute(
-                    f"INSERT INTO sys.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
+                    f"INSERT INTO {DB_NAME}.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
                 conn.commit()
                 print(f'Rows inserted: {str(count)}')
 
         if data_points == 9:
             amount = 0.5
-            tx = SendTk().send(wallet_to_send=WALLET2, amount=amount)
+            tx = SendTk().send(wallet_to_send=SEND_WALLET, amount=amount)
             if tx:
-                print(f'🤑 send {amount} to {WALLET2} is: {tx}')
+                print(f'🤑 send {amount} to {SEND_WALLET} is: {tx}')
                 print(f'👌 data send sensor ok and co2 ok')
             else:
                 print(f"😭 Transaction denied by network or insufficient gas")
@@ -146,14 +159,19 @@ async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float
 
     if token == TOKEN:
 
-        with pymysql.connect(host=SERVER,
-                             port=3306,
-                             user=USERNAME,
-                             passwd=PASSWORD,
-                             database=DATABASE) as conn:
+        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
+                                ssh_username=SSH_USER,
+                                ssh_password=SSH_KEY_PATH,
+                                remote_bind_address=(DB_HOST, DB_PORT),
+                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
+            conn = pymysql.connect(host='127.0.0.1',
+                                   port=tunnel.local_bind_port,
+                                   user=DB_USER,
+                                   password=DB_PASSWORD,
+                                   db=DB_NAME)
             with conn.cursor() as cursor:
                 count = cursor.execute(
-                    f"INSERT INTO sys.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
+                    f"INSERT INTO {DB_NAME}.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
                 conn.commit()
                 print(f'Rows inserted: {str(count)}')
 
@@ -167,12 +185,17 @@ async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float
 async def query_co2(rows: int, token: str):
     if token == TOKEN:
 
-        with pymysql.connect(host=SERVER,
-                             port=3306,
-                             user=USERNAME,
-                             passwd=PASSWORD,
-                             database=DATABASE) as conn:
-            sql_query = f'SELECT * FROM sys.co2Storage ORDER BY date_c DESC LIMIT {rows}'
+        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
+                                ssh_username=SSH_USER,
+                                ssh_password=SSH_KEY_PATH,
+                                remote_bind_address=(DB_HOST, DB_PORT),
+                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
+            conn = pymysql.connect(host='127.0.0.1',
+                                   port=tunnel.local_bind_port,
+                                   user=DB_USER,
+                                   password=DB_PASSWORD,
+                                   db=DB_NAME)
+            sql_query = f'SELECT * FROM {DB_NAME}.co2Storage ORDER BY date_c DESC LIMIT {rows}'
             df = pd.read_sql(sql_query, conn)
 
             json_output = df.to_dict()

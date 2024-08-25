@@ -2,15 +2,22 @@ import os
 import pymysql
 import datetime
 import pandas as pd
+from dotenv import load_dotenv
 import plotly.graph_objects as go
+from sshtunnel import SSHTunnelForwarder
 from plotly.subplots import make_subplots
 
+load_dotenv()
 
-SERVER = os.environ["SERVER"]
-DATABASE = os.environ["DATABASE"]
-USERNAME = os.environ["USERNAME"]
-PASSWORD = os.environ["PASSWORD"]
-DRIVER = os.environ["DRIVER"]
+SSH_HOST = os.environ.get('SSH_HOST')
+SSH_PORT = int(os.environ.get('SSH_PORT'))
+SSH_USER = os.environ.get('SSH_USER')
+SSH_KEY_PATH = os.environ.get('SSH_KEY_PATH')
+DB_HOST = os.environ.get('DB_HOST')
+DB_PORT = int(os.environ.get('DB_PORT'))
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_NAME = os.environ.get('DB_NAME')
 
 
 class plotSensor:
@@ -20,12 +27,17 @@ class plotSensor:
         this class request database co2 info
         """
 
-        with pymysql.connect(host=SERVER,
-                             port=3306,
-                             user=USERNAME,
-                             passwd=PASSWORD,
-                             database=DATABASE) as conn:
-            sql_query = f'SELECT * FROM sys.co2Storage'
+        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
+                                ssh_username=SSH_USER,
+                                ssh_password=SSH_KEY_PATH,
+                                remote_bind_address=(DB_HOST, DB_PORT),
+                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
+            conn = pymysql.connect(host='127.0.0.1',
+                                   port=tunnel.local_bind_port,
+                                   user=DB_USER,
+                                   password=DB_PASSWORD,
+                                   db=DB_NAME)
+            sql_query = f'SELECT * FROM {DB_NAME}.co2Storage'
             df = pd.read_sql(sql_query, conn)
 
         df['date_c'] = pd.to_datetime(df['date_c'])
