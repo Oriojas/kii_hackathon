@@ -35,6 +35,7 @@ DB_NAME = os.environ.get('DB_NAME')
 TOKEN = os.environ.get('TOKEN')
 MAIN_WALLET = os.environ.get('MAIN_WALLET')
 SEND_WALLET = os.environ.get('SEND_WALLET')
+MAIN_DIR = os.environ.get('MAIN_DIR')
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -50,9 +51,9 @@ async def home(request: Request):
     plotGps().plot()
     print(f'Map OK!')
 
-    with open('templates/plots/new_plot.txt', 'r', encoding='utf-8') as file:
+    with open(f'templates/plots/new_plot.txt', 'r', encoding='utf-8') as file:
         plot = file.readlines()
-    with open('templates/plots/map.txt', 'r', encoding='utf-8') as file2:
+    with open(f'templates/plots/map.txt', 'r', encoding='utf-8') as file2:
         plot2 = file2.readlines()
 
     return templates.TemplateResponse("home_page/index.html", {

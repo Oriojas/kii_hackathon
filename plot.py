@@ -83,9 +83,9 @@ class plotSensor:
         # a simple HTML template
         template = 'var plotly_data = {}'
 
-        # write the JSON to the HTML template
-        with open('templates/plots/new_plot.txt', 'w', encoding='utf-8') as f:
-            f.write(template.format(fig_json))
+        # # write the JSON to the HTML template
+        # with open('templates/plots/new_plot.txt', 'w', encoding='utf-8') as f:
+        #     f.write(template.format(fig_json))
 
 
 if __name__ == '__main__':
