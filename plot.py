@@ -56,7 +56,7 @@ class plotSensor:
         fig = make_subplots(1, 2)
 
         fig.add_trace(go.Scatter(x=DF['date_c'],
-                                 y=DF['co2'][DF['origin'] == 'sensor03'],
+                                 y=DF['co2'][DF['origin'] == 'sensor1'],
                                  name='co2 (Sensor)',
                                  mode='lines',
                                  line_color='rgb(230,0,122)'), 1, 1)

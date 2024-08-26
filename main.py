@@ -118,7 +118,7 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
                 print(f'Rows inserted: {str(count)}')
 
         if data_points == 9:
-            amount = 0.5
+            amount = 1
             tx = SendTk().send(wallet_to_send=SEND_WALLET, amount=amount)
             if tx:
                 print(f'🤑 send {amount} to {SEND_WALLET} is: {tx}')
@@ -143,12 +143,14 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
             with open('data_user.json', "w") as outfile:
                 outfile.write(json_object)
 
-            print("🔥 With 10 points send 0.01 ACA")
+            print("🔥 With 10 points send 1 Kii")
 
         print(''.center(60, '='))
 
     else:
         print(f'Not valid token {token}')
+
+    return True
 
 
 @app.get('/data_co_send/')
