@@ -19,24 +19,8 @@ DB_NAME = os.environ.get('DB_NAME')
 
 
 class plotGps:
-    """
-    This class is responsible for fetching and plotting GPS data from a database.
-
-    Attributes:
-    rows (int): The number of rows to fetch from the database. Default is 45.
-
-    Methods:
-    __init__(self, rows: int = 45): Initializes the class and fetches the data from the database.
-    plot(self): Plots the fetched data using Plotly and saves it as a JSON file.
-    """
 
     def __init__(self, rows: int = 45):
-        """
-        Initializes the class and fetches the data from the database.
-
-        Parameters:
-        rows (int): The number of rows to fetch from the database. Default is 45.
-        """
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
                                 ssh_username=SSH_USER,
@@ -52,10 +36,6 @@ class plotGps:
             self.df = pd.read_sql(sql_query, conn)
 
     def plot(self):
-        """
-        Plots the fetched data using Plotly and saves it as a JSON file.
-        """
-
         fig = px.density_mapbox(self.df,
                                 lat='lat',
                                 lon='lon',
@@ -63,9 +43,8 @@ class plotGps:
                                 radius=20,
                                 zoom=14,
                                 height=320,
-                                color_continuous_scale=["#e6007a", "#cf006d", "#b80061", "#a10055", "#8a0049",
-                                                        "#73003d", "#5c0030", "#450024", "#2e0018", "#17000c",
-                                                        "#000000"],
+                                color_continuous_scale=["#4e2b93", "#6441a9", "#7a57bf", "#3a1f79", "#25145f",
+                                                        "#100945", "#0a062d", "#060418", "#02030c", "#000000"],
                                 mapbox_style="open-street-map")
         # fig.show()
         fig.update_layout(margin=dict(l=10, r=10, t=10, b=10),
@@ -74,6 +53,7 @@ class plotGps:
 
         template = 'var plotly_data2 = {}'
 
+        # write the JSON to the HTML template
         with open('templates/plots/map_2.txt', 'w', encoding='utf-8') as f:
             f.write(template.format(fig_json))
 

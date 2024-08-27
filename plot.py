@@ -92,7 +92,7 @@ class plotSensor:
                                  y=DF['co2'][DF['origin'] == 'sensor1'],
                                  name='co2 (Sensor)',
                                  mode='lines',
-                                 line_color='rgb(230,0,122)'), 1, 1)
+                                 line_color='rgb(78,43,147)'), 1, 1)
 
         fig.add_trace(go.Bar(name='Grant',
                              x=balance_w,
@@ -100,7 +100,7 @@ class plotSensor:
                              text=balance_w,
                              orientation='h',
                              textposition='auto',
-                             marker_color='rgb(230,0,122)'), 1, 2)
+                             marker_color='rgb(78,43,147)'), 1, 2)
 
         template = 'plotly_white'
         fig.update_layout(template=template,
