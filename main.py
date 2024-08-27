@@ -27,6 +27,7 @@ SSH_HOST = os.environ.get('SSH_HOST')
 SSH_PORT = int(os.environ.get('SSH_PORT'))
 SSH_USER = os.environ.get('SSH_USER')
 SSH_KEY_PATH = os.environ.get('SSH_KEY_PATH')
+SSH_HOST_KEY = os.environ.get('SSH_HOST_KEY')
 DB_HOST = os.environ.get('DB_HOST')
 DB_PORT = int(os.environ.get('DB_PORT'))
 DB_USER = os.environ.get('DB_USER')
@@ -150,6 +151,7 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
                                 ssh_username=SSH_USER,
+                                ssh_private_key_password=SSH_HOST_KEY,
                                 ssh_password=SSH_KEY_PATH,
                                 remote_bind_address=(DB_HOST, DB_PORT),
                                 local_bind_address=('127.0.0.1', 10022)) as tunnel:
@@ -224,6 +226,7 @@ async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
                                 ssh_username=SSH_USER,
+                                ssh_private_key_password=SSH_HOST_KEY,
                                 ssh_password=SSH_KEY_PATH,
                                 remote_bind_address=(DB_HOST, DB_PORT),
                                 local_bind_address=('127.0.0.1', 10022)) as tunnel:
@@ -262,6 +265,7 @@ async def query_co2(rows: int, token: str) -> JSONResponse:
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
                                 ssh_username=SSH_USER,
+                                ssh_private_key_password=SSH_HOST_KEY,
                                 ssh_password=SSH_KEY_PATH,
                                 remote_bind_address=(DB_HOST, DB_PORT),
                                 local_bind_address=('127.0.0.1', 10022)) as tunnel:
