@@ -19,8 +19,24 @@ DB_NAME = os.environ.get('DB_NAME')
 
 
 class plotGps:
+    """
+    This class is responsible for fetching and plotting GPS data from a database.
+
+    Attributes:
+    rows (int): The number of rows to fetch from the database. Default is 45.
+
+    Methods:
+    __init__(self, rows: int = 45): Initializes the class and fetches the data from the database.
+    plot(self): Plots the fetched data using Plotly and saves it as a JSON file.
+    """
 
     def __init__(self, rows: int = 45):
+        """
+        Initializes the class and fetches the data from the database.
+
+        Parameters:
+        rows (int): The number of rows to fetch from the database. Default is 45.
+        """
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
                                 ssh_username=SSH_USER,
@@ -36,6 +52,10 @@ class plotGps:
             self.df = pd.read_sql(sql_query, conn)
 
     def plot(self):
+        """
+        Plots the fetched data using Plotly and saves it as a JSON file.
+        """
+
         fig = px.density_mapbox(self.df,
                                 lat='lat',
                                 lon='lon',
@@ -50,15 +70,12 @@ class plotGps:
         # fig.show()
         fig.update_layout(margin=dict(l=10, r=10, t=10, b=10),
 )
-        # convert it to JSON
         fig_json = fig.to_json()
 
-        # a simple HTML template
         template = 'var plotly_data2 = {}'
 
-        # # write the JSON to the HTML template
-        # with open('templates/plots/map.txt', 'w', encoding='utf-8') as f:
-        #     f.write(template.format(fig_json))
+        with open('templates/plots/map_2.txt', 'w', encoding='utf-8') as f:
+            f.write(template.format(fig_json))
 
 
 if __name__ == '__main__':

@@ -12,8 +12,29 @@ PROVIDER_ENDPOINT = os.getenv("PROVIDER_ENDPOINT")
 
 
 class SendTk:
+    """
+    A class used to send tokens to a specified wallet on the KII blockchain.
+
+    Attributes
+    ----------
+    ledger : LedgerClient
+        An instance of LedgerClient for interacting with the KII blockchain.
+    web3 : Web3
+        An instance of Web3 for interacting with the Ethereum blockchain.
+    account : Account
+        An instance of Account for signing transactions.
+
+    Methods
+    -------
+    send(wallet_to_send: str, amount: float) -> str
+        Sends a specified amount of tokens to the specified wallet.
+        Returns the transaction hash.
+    """
 
     def __init__(self):
+        """
+        Constructs all the necessary attributes for the SendTk class.
+        """
         self.ledger = LedgerClient(NetworkConfig.kii_testnet())
         self.web3 = Web3(Web3.HTTPProvider(PROVIDER_ENDPOINT))
 
@@ -24,8 +45,22 @@ class SendTk:
 
         self.account = Account.from_key(MAIN_WALLET_KEY)
 
-    def send(self, wallet_to_send, amount):
+    def send(self, wallet_to_send: str, amount: float) -> str:
+        """
+        Sends a specified amount of tokens to the specified wallet.
 
+        Parameters
+        ----------
+        wallet_to_send : str
+            The address of the wallet to send tokens to.
+        amount : float
+            The amount of tokens to send.
+
+        Returns
+        -------
+        str
+            The transaction hash.
+        """
         print(f"Sender   Address: {MAIN_WALLET} "
               f"Balance: {self.ledger.get_balance(MAIN_WALLET)}")
 
@@ -49,10 +84,8 @@ class SendTk:
 
         print(f'Transaction sent with hash: {self.web3.to_hex(tx_hash)}')
 
-        # Esperar a que la transacción sea minada
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
 
-        # Imprimir un mensaje cuando la transacción haya sido completada
         print(f'Transaction {self.web3.to_hex(tx_hash)} has been confirmed in block {receipt.blockNumber}')
 
         print(f"Sender   Address: {MAIN_WALLET} "
@@ -61,7 +94,6 @@ class SendTk:
         print(f"Receiver Address: {wallet_to_send} "
               f"Balance: {self.ledger.get_balance(wallet_to_send)}")
 
-        # Return the transaction hash as a readable string
         return self.web3.to_hex(tx_hash)
 
 

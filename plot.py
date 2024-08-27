@@ -21,10 +21,27 @@ DB_NAME = os.environ.get('DB_NAME')
 
 
 class plotSensor:
+    """
+    This class is responsible for fetching data from a database, processing it, and creating a plot.
+    The plot includes the last hour's worth of CO2 measurements from a sensor and a bar chart displaying wallet balances.
+
+    Attributes:
+    -----------
+    None
+
+    Methods:
+    --------
+    __init__(self):
+        Establishes a secure SSH tunnel to the database, fetches the last hour's worth of data, and stores it in self.DF.
+
+    plot(self, wallet_1: float, wallet_2: float):
+        Creates a plotly figure with two subplots: one for CO2 measurements and one for wallet balances.
+        The figure is then saved as a JSON string in a file.
+    """
 
     def __init__(self):
         """
-        this class request database co2 info
+        Establishes a secure SSH tunnel to the database, fetches the last hour's worth of data, and stores it in self.DF.
         """
 
         with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
@@ -47,7 +64,23 @@ class plotSensor:
 
         self.DF = df[df['date_c'] > init]
 
-    def plot(self, wallet_1, wallet_2):
+    def plot(self, wallet_1: float, wallet_2: float):
+        """
+        Creates a plotly figure with two subplots: one for CO2 measurements and one for wallet balances.
+        The figure is then saved as a JSON string in a file.
+
+        Parameters:
+        -----------
+        wallet_1: float
+            The balance of the first wallet.
+        wallet_2: float
+            The balance of the second wallet.
+
+        Returns:
+        --------
+        None
+        """
+
         DF = self.DF
 
         balance_w = [wallet_2, wallet_1]
@@ -77,15 +110,13 @@ class plotSensor:
                           title="PPM co2 and WALLET STATUS LAST HOUR")
         # fig.show()
         fig.update_layout(showlegend=False)
-        # convert it to JSON
+
         fig_json = fig.to_json()
 
-        # a simple HTML template
         template = 'var plotly_data = {}'
 
-        # # write the JSON to the HTML template
-        # with open('templates/plots/new_plot.txt', 'w', encoding='utf-8') as f:
-        #     f.write(template.format(fig_json))
+        with open('templates/plots/new_plot_2.txt', 'w', encoding='utf-8') as f:
+            f.write(template.format(fig_json))
 
 
 if __name__ == '__main__':
