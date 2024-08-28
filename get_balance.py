@@ -49,7 +49,7 @@ class GetBalance:
             The balance of the given wallet.
 
         """
-        balance_off = self.ledger_client.get_balance(wallet)
+        balance_off = self.ledger_client.get_balance(wallet) / 1000000000000000000
         print(balance_off)
         return balance_off
 
