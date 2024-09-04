@@ -15,7 +15,7 @@
     <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">KiiGuardian</a>
     <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">Kickin' It With KiiChain</a>
     <button id="connectButton" class="btn btn-primary">Connect to MetaMask</button>
-
+    <button id="disconnectButton" class="btn btn-danger" style="display: none;">Disconnect</button>
   </header>
 
   <div class="container-fluid">
@@ -44,8 +44,8 @@
               <h4 class="sidebar-heading d-flex justify-content-between mt-4 mb-1 text-muted text-uppercase">
                 Last network node kiiNetwork:
               </h4>
-              <p class="text-break">
-                {{ln}}
+              <p class="text-break" id="walletAddress">
+                
               </p>
             </div>
             <div class="container-fluid">
@@ -61,7 +61,7 @@
                 Wallet Reward:
               </h4>
               <p class="text-break">
-                0x1d870f1210e66cba98093682b84d4491Ec04141b
+                
               </p>
             </div>
           </ul>
@@ -134,21 +134,57 @@
       dappMetadata: {
         name: "KiiGuardian",
         url: window.location.href,
-      },
-      infuraAPIKey: "your-infura-api-key", // Opcional
+      }
     });
 
-    document.getElementById('connectButton').addEventListener('click', () => {
+    const connectButton = document.getElementById('connectButton');
+    const disconnectButton = document.getElementById('disconnectButton');
+    const walletAddressElement = document.getElementById('walletAddress');
+
+    const updateWalletAddress = (address) => {
+      walletAddressElement.textContent = address || "No wallet connected";
+    };
+
+    const checkConnection = async () => {
+      const ethereum = MMSDK.getProvider();
+      try {
+        const accounts = await ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length > 0) {
+          // Ya hay una cuenta conectada
+          connectButton.style.display = 'none';
+          disconnectButton.style.display = 'inline-block';
+          updateWalletAddress(accounts[0]);
+          console.log('Already connected account:', accounts[0]);
+        }
+      } catch (error) {
+        console.error('Error checking MetaMask connection', error);
+      }
+    };
+
+    connectButton.addEventListener('click', () => {
       const ethereum = MMSDK.getProvider();
       ethereum.request({ method: 'eth_requestAccounts' })
         .then(accounts => {
           console.log('Connected account:', accounts[0]);
-          document.getElementById('connectButton').innerText = 'Connected';
+          connectButton.style.display = 'none';
+          disconnectButton.style.display = 'inline-block';
+          updateWalletAddress(accounts[0]);
         })
         .catch(error => {
           console.error('Error connecting to MetaMask', error);
         });
     });
+
+    disconnectButton.addEventListener('click', () => {
+      // Aquí puedes realizar cualquier tarea necesaria para desconectar.
+      // MetaMask no tiene un método explícito para "desconectar", pero puedes limpiar la UI.
+      connectButton.style.display = 'inline-block';
+      disconnectButton.style.display = 'none';
+      updateWalletAddress(null);
+      console.log('Disconnected from MetaMask');
+    });
+
+    window.addEventListener('load', checkConnection);
   </script>
 </body>
 
