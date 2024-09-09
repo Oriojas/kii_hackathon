@@ -154,7 +154,8 @@ async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon
                                 ssh_private_key_password=SSH_HOST_KEY,
                                 ssh_password=SSH_KEY_PATH,
                                 remote_bind_address=(DB_HOST, DB_PORT),
-                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
+                                local_bind_address=('127.0.0.1', 10022),
+                                mute_exceptions=True) as tunnel:
             conn = pymysql.connect(host='127.0.0.1',
                                    port=tunnel.local_bind_port,
                                    user=DB_USER,

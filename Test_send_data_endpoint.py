@@ -26,4 +26,4 @@ for index, row in df.iterrows():
 
     print(f"Response for row {index}: {response.status_code}, {response.text}")
 
-    time.sleep(120)
+    time.sleep(10)
