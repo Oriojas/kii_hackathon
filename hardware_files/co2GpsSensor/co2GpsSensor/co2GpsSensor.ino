@@ -12,7 +12,7 @@ int TXPin = 15;
 int GPSBaud = 9600;
 
 // End point
-String serverName = "http://ec2-184-72-114-228.compute-1.amazonaws.com:8086/data_co_send_tokens/";
+String serverName = "http://localhost:8086/api/telemetry";
 
 // Create a TinyGPS++ object and WiFi client
 TinyGPSPlus gps;

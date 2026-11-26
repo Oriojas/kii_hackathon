@@ -1,182 +1,335 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <title>KiiGuardian</title>
-  <link href="{{ url_for('css', path='/style.css') }}" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VERA - Verified Environmental Responsibility Agent</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a1118;
+            --card-bg: #111d27;
+            --card-border: #1d2e3d;
+            --accent-green: #00d293;
+            --accent-blue: #0099ff;
+            --accent-red: #ff4d6d;
+            --text-main: #e2e8f0;
+            --text-muted: #8e9cae;
+        }
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+        }
+        .navbar-custom {
+            background-color: rgba(17, 29, 39, 0.95);
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+        }
+        .badge-verified {
+            background: linear-gradient(135deg, #00d293 0%, #00a876 100%);
+            color: #032014;
+            font-weight: 700;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dashboard-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+            margin-bottom: 1.5rem;
+        }
+        .step-node {
+            background-color: #172635;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin-bottom: 0.8rem;
+            transition: all 0.2s ease;
+        }
+        .step-node:hover {
+            border-color: var(--accent-green);
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background-color: var(--accent-green);
+            color: #000;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .status-eligible { background-color: rgba(0, 210, 147, 0.2); color: #00d293; border: 1px solid #00d293; }
+        .status-blocked { background-color: rgba(255, 77, 109, 0.2); color: #ff4d6d; border: 1px solid #ff4d6d; }
+        .btn-tab-custom {
+            background: #172635;
+            color: var(--text-muted);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .btn-tab-custom.active {
+            background: var(--accent-green);
+            color: #0a1118;
+            border-color: var(--accent-green);
+        }
+    </style>
 </head>
-
 <body>
 
-  <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">KiiGuardian</a>
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">Kickin' It With KiiChain</a>
-    <button id="connectButton" class="btn btn-primary">Connect to MetaMask</button>
-    <button id="disconnectButton" class="btn btn-danger" style="display: none;">Disconnect</button>
-  </header>
-
-  <div class="container-fluid">
-    <div class="row">
-      <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-        <div class="position-sticky pt-3 sidebar-sticky">
-          <ul class="nav flex-column">
-            <div class="container-fluid">
-              <br>
-              <p class="text-break">
-                KiiGuardian is a blockchain-based project that uses sensors to measure CO2 emissions and GPS to track
-                their location. The data collected by KiiGuardian is used to create a map of CO2 emissions around the
-                world. This map is then used to raise awareness of the issue of climate change and motivate people to
-                reduce their carbon footprint.
-              </p>
+    <!-- Barra de Navegación -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top py-3">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <span class="fs-4 fw-bold text-white">VERA</span>
+                <span class="text-muted fs-6">| Concordium Trusted Agents</span>
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge-verified">
+                    <i class="bi bi-shield-check"></i> Verified by Concordium
+                </span>
+                <a href="/.well-known/agent-card.json" target="_blank" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-filetype-json"></i> Agent Card (CIS-8004)
+                </a>
             </div>
-            <div class="row" style="padding-left: 15px">
-              <div class="col">
-                <img src="{{ url_for('img', path='/KiiGuardian.png') }}" height="100px" alt="logo_hack">
-              </div>
-              <div class="col">
-                <img src="img/Kiichainlogo.png" class="rounded mx-auto d-block" height="118px" alt="Kii">
-              </div>
-            </div>
-            <div class="container-fluid">
-              <h4 class="sidebar-heading d-flex justify-content-between mt-4 mb-1 text-muted text-uppercase">
-                Wallet Pool Reward:
-              </h4>
-              <p class="text-break">
-                0x48e72B52c0858E5dAb8b446A8399309C19a99F63
-              </p>
-            </div>
-            <div class="container-fluid">
-              <h4 class="sidebar-heading d-flex justify-content-between mt-4 mb-1 text-muted text-uppercase">
-                Wallet Reward:
-              </h4>
-              <p class="text-break" id="walletAddress">
-              </p>
-            </div>
-          </ul>
         </div>
-      </nav>
+    </nav>
 
-      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-        <br>
-        <h4 class="h4">Dashboard</h4>
-
-        <div class="mb-3 border rounded" style='padding: 16px;'>
-          <div id='divPlotly'>
-            <script>
-              {{plot | safe}}
-              Plotly.react('divPlotly', plotly_data.data, plotly_data.layout);
-            </script>
-          </div>
-        </div>
-
-        <div class="mb-3 border rounded" style='padding: 10px;'>
-          <div class="container text-start" style='padding: 10px;'>
-            <div class="row">
-              <div class="col" style='padding: 4px;'>
-                <h4 class="h4">¿How it works?</h4>
-                <p class="text-start">
-                  KiiGuardian is a blockchain-based project that uses an IoT device to measure the concentration of
-                  carbon monoxide (CO2) and track CO2 emissions in different locations. The solution works in four key
-                  steps:
-                  IoT device: KiiGuardian uses an IoT device to measure the concentration of CO2. This device can be
-                  installed in various locations, such as homes, offices, cars, bicycles, and other places.
-                  Connection to the blockchain network: Once the IoT device is installed, it is connected to the
-                  blockchain network to perform transactions. The blockchain network is a decentralized and secure
-                  database that records all transactions made.
-                  Measurement and tracking of CO2 emissions: The IoT device measures the concentration of CO2 and tracks
-                  CO2 emissions in different locations. The collected data is used to create a map of CO2 concentration
-                  around the world, which helps raise awareness about the problem of climate change and motivates people
-                  to reduce their carbon footprint.
-                  Reward system: KiiGuardian uses a reward system to incentivize users to reduce their carbon footprint.
-                  When users manage to reduce their CO2 emissions below a specific target, it will deduct from the grant
-                  account to the stake account. Users receive tokens as a reward for reducing their carbon footprint.
-                  for contact:
-                  <a href="mailto:jhonteajada95@gmail.com">Jhon Tejada</a>, <a href="mailto:oscarriojas@gmail.com">Oscar
-                    Riojas</a>, <a href="mailto:luisf.maring0910@gmail.com">Luis Felipe Marin</a>, check repo in <a
-                    href="https://github.com/Oriojas/kii_hackathon.git">CO2_KiiGuardian</a>
-                </p>
-              </div>
-              <div class="col" style='padding: 0px;'>
-                <h4 class="h4">Georeferencing</h4>
-                <div id='divPlotly2'>
-                  <script>
-                    {{plot2 | safe}}
-                    Plotly.react('divPlotly2', plotly_data2.data, plotly_data2.layout);
-                  </script>
+    <!-- Contenido Principal -->
+    <div class="container-fluid px-4 py-4">
+        <!-- Banner de Identidad On-Chain -->
+        <div class="row">
+            <div class="col-12">
+                <div class="dashboard-card border-success border-opacity-25">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h4 class="fw-bold mb-1"><i class="bi bi-robot text-success"></i> Agente Ambiental Verificable</h4>
+                            <p class="text-muted mb-0">
+                                Transforma datos físicos y sintéticos en evidencia trazable, decisiones explicables y liquidaciones en Concordium Testnet.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <span class="text-muted small d-block">Contrato CIS-8004: <code class="text-info">{{ cis8004_index }}.0</code></span>
+                            <span class="text-muted small d-block">Contrato CIS-8: <code class="text-info">{{ cis8_index }}.0</code></span>
+                            <span class="text-muted small d-block">Reward Pool: <code class="text-info">{{ reward_pool_index }}.0</code></span>
+                        </div>
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
         </div>
-      </main>
 
+        <!-- Selector de Escenario y Botones de Prueba para el Jurado -->
+        <div class="row mb-3">
+            <div class="col-12 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="btn-group" role="group">
+                    <button id="btnHomeAir" class="btn btn-tab-custom active px-4 py-2" onclick="loadScenario('home_air', false)">
+                        <i class="bi bi-house-door"></i> Vera Home Air (MQ-135 Físico)
+                    </button>
+                    <button id="btnBusiness" class="btn btn-tab-custom px-4 py-2" onclick="loadScenario('business', false)">
+                        <i class="bi bi-building"></i> Vera Business (4 Zonas Sintéticas)
+                    </button>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small">Simular caso jurado:</span>
+                    <button class="btn btn-outline-success btn-sm" onclick="triggerValidCase()">
+                        <i class="bi bi-check-circle"></i> Ruta Válida
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="triggerBlockedCase()">
+                        <i class="bi bi-x-circle"></i> Ruta Bloqueada
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuadrícula Principal: Gráfico + Evaluación Determinista + Grafo de Attestations -->
+        <div class="row">
+            <!-- Columna Izquierda: Visualización de Datos y Análisis del Agente -->
+            <div class="col-lg-7">
+                <div class="dashboard-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0" id="plotTitle">Telemetría y Línea Base</h5>
+                        <span id="evaluationStatus" class="status-badge status-eligible">EVALUANDO</span>
+                    </div>
+                    <div id="plotlyDiv" style="height: 380px;"></div>
+                    
+                    <hr class="border-secondary opacity-25 my-4">
+
+                    <h5 class="fw-bold mb-2"><i class="bi bi-chat-left-dots text-info"></i> Explicación del Agente VERA</h5>
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 mb-3">
+                        <p id="agentExplanation" class="mb-2 text-light">Cargando análisis del agente...</p>
+                        <div id="agentMitigations" class="small text-muted"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Grafo de Attestations (7 Niveles) y Verificación On-Chain -->
+            <div class="col-lg-5">
+                <div class="dashboard-card">
+                    <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-diagram-3 text-success"></i> Grafo de Attestations</span>
+                        <span class="badge bg-secondary small">7 Niveles</span>
+                    </h5>
+                    <div id="lineageContainer" style="max-height: 600px; overflow-y: auto;">
+                        <!-- Nodos inyectados dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
+    <script>
+        let currentScenario = 'home_air';
 
+        async function loadScenario(scenario, isBlocked = false) {
+            currentScenario = scenario;
+            document.getElementById('btnHomeAir').classList.toggle('active', scenario === 'home_air');
+            document.getElementById('btnBusiness').classList.toggle('active', scenario === 'business');
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-  <script src="https://c0f4f41c-2f55-4863-921b-sdk-docs.github.io/cdn/metamask-sdk.js"></script>
-  <script>
-    const MMSDK = new MetaMaskSDK.MetaMaskSDK({
-      dappMetadata: {
-        name: "KiiGuardian",
-        url: window.location.href,
-      }
-    });
+            let url = `/api/scenarios/${scenario === 'home_air' ? 'home-air' : 'business'}`;
+            if (isBlocked && scenario === 'home_air') {
+                url += '?expired=true';
+            } else if (isBlocked && scenario === 'business') {
+                url += '?incomplete=true';
+            }
 
-    const connectButton = document.getElementById('connectButton');
-    const disconnectButton = document.getElementById('disconnectButton');
-    const walletAddressElement = document.getElementById('walletAddress');
+            const response = await fetch(url);
+            const data = await response.json();
 
-    const updateWalletAddress = (address) => {
-      walletAddressElement.textContent = address || "No wallet connected";
-    };
+            // 1. Actualizar estado de evaluación
+            const statusBadge = document.getElementById('evaluationStatus');
+            statusBadge.innerText = data.evaluation.status;
+            if (data.evaluation.payout_eligible) {
+                statusBadge.className = 'status-badge status-eligible';
+            } else {
+                statusBadge.className = 'status-badge status-blocked';
+            }
 
-    const checkConnection = async () => {
-      const ethereum = MMSDK.getProvider();
-      try {
-        const accounts = await ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          // Ya hay una cuenta conectada
-          connectButton.style.display = 'none';
-          disconnectButton.style.display = 'inline-block';
-          updateWalletAddress(accounts[0]);
-          console.log('Already connected account:', accounts[0]);
+            // 2. Explicación del Agente
+            document.getElementById('agentExplanation').innerText = data.report.executive_summary;
+            let mitHtml = '<strong>Recomendaciones / Acciones:</strong><ul class="mb-0 mt-1">';
+            data.report.mitigation_actions.forEach(m => {
+                mitHtml += `<li>${m}</li>`;
+            });
+            mitHtml += '</ul>';
+            document.getElementById('agentMitigations').innerHTML = mitHtml;
+
+            // 3. Renderizar Gráfico Plotly
+            renderPlot(data);
+
+            // 4. Renderizar Grafo de Attestations
+            renderLineage(data.lineage);
         }
-      } catch (error) {
-        console.error('Error checking MetaMask connection', error);
-      }
-    };
 
-    connectButton.addEventListener('click', () => {
-      const ethereum = MMSDK.getProvider();
-      ethereum.request({ method: 'eth_requestAccounts' })
-        .then(accounts => {
-          console.log('Connected account:', accounts[0]);
-          connectButton.style.display = 'none';
-          disconnectButton.style.display = 'inline-block';
-          updateWalletAddress(accounts[0]);
-        })
-        .catch(error => {
-          console.error('Error connecting to MetaMask', error);
-        });
-    });
+        function renderPlot(data) {
+            if (data.scenario === 'home_air') {
+                document.getElementById('plotTitle').innerText = 'Vera Home Air: Señal Cruda MQ-135 (ADC)';
+                const x = Array.from({length: 48}, (_, i) => `Lote ${i+1}`);
+                const y = [];
+                for(let i=0; i<48; i++) {
+                    if (i < 12) y.push(410 + Math.sin(i)*5);
+                    else if (i < 24) y.push(680 + Math.sin(i)*15);
+                    else if (i < 36) y.push(530 - (i-24)*10);
+                    else y.push(415 + Math.sin(i)*4);
+                }
+                const trace = {
+                    x: x,
+                    y: y,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#00d293', width: 2 },
+                    marker: { size: 6, color: '#00a876' },
+                    name: 'Señal MQ-135'
+                };
+                const layout = {
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    margin: { t: 20, r: 20, b: 40, l: 40 },
+                    font: { color: '#8e9cae' },
+                    xaxis: { gridcolor: '#1d2e3d' },
+                    yaxis: { gridcolor: '#1d2e3d', title: 'Valor Crudo ADC' }
+                };
+                Plotly.newPlot('plotlyDiv', [trace], layout, {responsive: true});
+            } else {
+                document.getElementById('plotTitle').innerText = 'Vera Business: Intensidad por Zona (Scope 2)';
+                const trace = {
+                    x: ['Oficinas', 'Producción', 'Bodega', 'Logística'],
+                    y: [0.38, 0.44, 0.35, 0.41],
+                    type: 'bar',
+                    marker: { color: ['#00d293', '#ff4d6d', '#0099ff', '#f59e0b'] }
+                };
+                const layout = {
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor: 'transparent',
+                    margin: { t: 20, r: 20, b: 40, l: 40 },
+                    font: { color: '#8e9cae' },
+                    xaxis: { gridcolor: '#1d2e3d' },
+                    yaxis: { gridcolor: '#1d2e3d', title: 'kg CO2e / unidad' }
+                };
+                Plotly.newPlot('plotlyDiv', [trace], layout, {responsive: true});
+            }
+        }
 
-    disconnectButton.addEventListener('click', () => {
-      // Aquí puedes realizar cualquier tarea necesaria para desconectar.
-      // MetaMask no tiene un método explícito para "desconectar", pero puedes limpiar la UI.
-      connectButton.style.display = 'inline-block';
-      disconnectButton.style.display = 'none';
-      updateWalletAddress(null);
-      console.log('Disconnected from MetaMask');
-    });
+        function renderLineage(lineage) {
+            const container = document.getElementById('lineageContainer');
+            container.innerHTML = '';
 
-    window.addEventListener('load', checkConnection);
-  </script>
+            const levelNames = {
+                1: 'Dispositivo / Fuente',
+                2: 'Calibración & Vigencia',
+                3: 'Lote de Telemetría',
+                4: 'Dataset Agregado',
+                5: 'Análisis & Anomalías',
+                6: 'Evaluación de Política',
+                7: 'Liquidación en Concordium'
+            };
+
+            lineage.forEach(node => {
+                const nodeDiv = document.createElement('div');
+                nodeDiv.className = 'step-node';
+                nodeDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold small text-light">
+                            <span class="step-number">${node.level}</span>
+                            ${levelNames[node.level] || 'Nivel ' + node.level}
+                        </span>
+                        <code class="small text-info">${node.hash.substring(0, 10)}...</code>
+                    </div>
+                    <div class="text-muted small ps-4">
+                        ${node.payload.device_id || node.payload.dataset_id || node.payload.status || 'Attestation válida'}
+                    </div>
+                `;
+                container.appendChild(nodeDiv);
+            });
+        }
+
+        function triggerValidCase() {
+            loadScenario(currentScenario, false);
+        }
+
+        function triggerBlockedCase() {
+            loadScenario(currentScenario, true);
+        }
+
+        // Cargar por defecto
+        window.onload = () => loadScenario('home_air', false);
+    </script>
 </body>
-
 </html>

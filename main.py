@@ -1,293 +1,213 @@
+"""
+VERA - Verified Environmental Responsibility Agent
+Servidor Backend FastAPI y endpoints para Concordium Trusted Agents Hackathon.
+"""
+
 import os
 import json
-import pymysql
-import uvicorn
-import pandas as pd
-from send_tk import SendTk
-from get_balance import GetBalance
-from plot import plotSensor
-from maps import plotGps
-from dotenv import load_dotenv
+import sqlite3
+from typing import Optional, Dict, Any, List
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, Request, HTTPException, Query, Header, status
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.encoders import jsonable_encoder
-from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sshtunnel import SSHTunnelForwarder
+from dotenv import load_dotenv
+
+from vera_core.config import VeraConfig
+from vera_core.attestations import AttestationGraph, compute_evidence_root, compute_policy_hash
+from vera_core.policy_engine import PolicyEngine
+from vera_core.scenarios import get_home_air_scenario, get_business_scenario
+from vera_core.agent import VeraAgent
 
 load_dotenv()
 
-app = FastAPI()
+app = FastAPI(
+    title="VERA Core & Concordium Agent API",
+    description="Verified Environmental Responsibility Agent para Concordium Trusted Agents Hackathon",
+    version="1.0.0"
+)
 
+# Servir archivos estáticos y plantillas
 app.mount("/css", StaticFiles(directory="css"), name="css")
 app.mount("/img", StaticFiles(directory="img"), name="img")
 templates = Jinja2Templates(directory="templates")
 
-SSH_HOST = os.environ.get('SSH_HOST')
-SSH_PORT = int(os.environ.get('SSH_PORT'))
-SSH_USER = os.environ.get('SSH_USER')
-SSH_KEY_PATH = os.environ.get('SSH_KEY_PATH')
-SSH_HOST_KEY = os.environ.get('SSH_HOST_KEY')
-DB_HOST = os.environ.get('DB_HOST')
-DB_PORT = int(os.environ.get('DB_PORT'))
-DB_USER = os.environ.get('DB_USER')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
-DB_NAME = os.environ.get('DB_NAME')
-TOKEN = os.environ.get('TOKEN')
-MAIN_WALLET = os.environ.get('MAIN_WALLET')
-SEND_WALLET = os.environ.get('SEND_WALLET')
-MAIN_DIR = os.environ.get('MAIN_DIR')
+config = VeraConfig.from_env()
+agent = VeraAgent(config)
+policy_engine = PolicyEngine(config)
+
+# Inicializar Base de Datos SQLite local si aplica
+SQLITE_DB_PATH = os.environ.get("SQLITE_DB_PATH", "./vera_storage.db")
+
+def init_db():
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS telemetry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            raw_signal REAL NOT NULL,
+            lat REAL,
+            lon REAL,
+            sequence INTEGER,
+            timestamp INTEGER NOT NULL,
+            evidence_hash TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            evidence_id TEXT UNIQUE NOT NULL,
+            status TEXT NOT NULL,
+            policy_hash TEXT NOT NULL,
+            recipient TEXT NOT NULL,
+            amount REAL NOT NULL,
+            tx_hash TEXT,
+            timestamp INTEGER NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+
+@app.get("/.well-known/agent-card.json")
+async def get_agent_card():
+    """
+    Especificación CIS-8004: Agent Card pública del Agente VERA con la extensión Concordium Badge.
+    """
+    card = agent.get_agent_card()
+    card_json = json.dumps(card, sort_keys=True, separators=(',', ':'))
+    import hashlib
+    sha256_hash = hashlib.sha256(card_json.encode('utf-8')).hexdigest()
+    
+    return JSONResponse(
+        content=card,
+        headers={
+            "X-Agent-Card-Hash": sha256_hash,
+            "X-Agent-Status": "Active" if config.agent_active else "Inactive",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """
-    This function serves as the main page of the application. It retrieves the balance of two wallets,
-    generates plots for the balance and GPS data, and renders the home page with the plots.
-
-    Parameters:
-    request (Request): The FastAPI Request object containing information about the incoming request.
-
-    Returns:
-    HTMLResponse: The rendered home page with the plots.
+    Dashboard interactivo de VERA para la Concordium Trusted Agents Hackathon.
     """
-
-    bal_obj = GetBalance()
-    w_1 = bal_obj.fit(wallet=MAIN_WALLET)  # Get balance of the main wallet
-    w_2 = bal_obj.fit(wallet=SEND_WALLET)  # Get balance of the sending wallet
-
-    plotSensor().plot(wallet_1=w_1, wallet_2=w_2)  # Generate plot for the wallet balances
-    print(f'Plot OK!')
-
-    plotGps().plot()  # Generate plot for the GPS data
-    print(f'Map OK!')
-
-    with open(f'templates/plots/new_plot_2.txt', 'r', encoding='utf-8') as file:
-        plot = file.readlines()  # Read the plot data from a file
-    with open(f'templates/plots/map_2.txt', 'r', encoding='utf-8') as file2:
-        plot2 = file2.readlines()  # Read the GPS plot data from a file
-
     return templates.TemplateResponse("home_page/index.html", {
         "request": request,
-        "plot": str(plot[0]),  # Pass the plot data to the template
-        "plot2": str(plot2[0]),  # Pass the GPS plot data to the template
+        "agent_name": config.agent_name,
+        "cis8004_index": config.cis8004_index,
+        "cis8_index": config.cis8_index,
+        "evidence_registry_index": config.evidence_registry_index,
+        "reward_pool_index": config.reward_pool_index,
+        "agent_account": config.concordium_agent_account,
+        "external_key": config.external_key_address
     })
 
 
-@app.get('/balance/')
-async def balance(wallet_balance: str) -> float:
+@app.get("/api/scenarios/home-air")
+async def scenario_home_air(expired: bool = False, tampered: bool = False, incomplete: bool = False):
     """
-    This function retrieves the balance of a specified wallet using the GetBalance class.
-
-    Parameters:
-    wallet_balance (str): The address of the wallet whose balance needs to be retrieved.
-
-    Returns:
-    float: The balance of the specified wallet.
+    Retorna el escenario Vera Home Air (48 lecturas físicas/simuladas MQ-135 + evaluación de política).
     """
+    graph, batch = get_home_air_scenario(
+        expired_calibration=expired,
+        tampered=tampered,
+        incomplete=incomplete
+    )
+    result = policy_engine.evaluate_graph(graph, record_in_graph=True)
+    report = agent.generate_voluntary_report(graph, result)
+    
+    return {
+        "scenario": "home_air",
+        "evaluation": {
+            "status": result.status,
+            "payout_eligible": result.payout_eligible,
+            "reason": result.reason,
+            "policy_hash": result.policy_hash,
+            "checks": [
+                {"name": c.check_name, "passed": c.passed, "details": c.details}
+                for c in result.checks
+            ]
+        },
+        "report": report.to_dict(),
+        "lineage": graph.get_lineage(),
+        "batch_sample": batch[:5]
+    }
 
-    bal_obj = GetBalance()
 
-    balance_off = bal_obj.fit(wallet=wallet_balance)
-
-    return balance_off
-
-
-@app.get('/send/')
-async def send(wallet_send: str, token: str) -> bool:
+@app.get("/api/scenarios/business")
+async def scenario_business(tampered: bool = False, incomplete: bool = False):
     """
-    This function sends a specified amount of tokens to a specified wallet.
-    It checks if the provided token is valid before proceeding with the transaction.
-
-    Parameters:
-    wallet_send (str): The address of the wallet to which the tokens will be sent.
-    token (str): The token used to authenticate the request.
-
-    Returns:
-    bool: True if the transaction is successful and the token is valid.
-          False if the transaction fails or the token is invalid.
+    Retorna el escenario Vera Business (4 zonas sintéticas declaradas + evaluación de política).
     """
+    graph, batch = get_business_scenario(
+        tampered=tampered,
+        incomplete=incomplete
+    )
+    result = policy_engine.evaluate_graph(graph, record_in_graph=True)
+    report = agent.generate_voluntary_report(graph, result)
+    
+    return {
+        "scenario": "business",
+        "evaluation": {
+            "status": result.status,
+            "payout_eligible": result.payout_eligible,
+            "reason": result.reason,
+            "policy_hash": result.policy_hash,
+            "checks": [
+                {"name": c.check_name, "passed": c.passed, "details": c.details}
+                for c in result.checks
+            ]
+        },
+        "report": report.to_dict(),
+        "lineage": graph.get_lineage(),
+        "batch_sample": batch
+    }
 
-    if token == TOKEN:
-        amount = 0.1
-        tx = SendTk().send(wallet_to_send=wallet_send, amount=amount)
-        print(f'Tx is: {tx}')
+
+@app.post("/api/telemetry")
+async def receive_telemetry(payload: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """
+    Recepción de telemetría IoT desde ESP8266/ESP32.
+    """
+    expected_token = os.environ.get("API_AUTH_TOKEN", "your_secure_random_api_token_here")
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
     else:
-        print(f'Not valid token {token}')
-        tx = False
+        token = payload.get("token")
+        
+    if token != expected_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no autorizado")
 
-    return tx
+    device_id = payload.get("device_id", "sensor-esp8266")
+    source_type = payload.get("source_type", "physical")
+    raw_signal = float(payload.get("raw_signal", 0.0))
+    lat = float(payload.get("lat", 0.0))
+    lon = float(payload.get("lon", 0.0))
+    sequence = int(payload.get("sequence", 0))
+    ts = int(payload.get("timestamp", datetime.now(timezone.utc).timestamp()))
 
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO telemetry (device_id, source_type, raw_signal, lat, lon, sequence, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (device_id, source_type, raw_signal, lat, lon, sequence, ts)
+    )
+    conn.commit()
+    conn.close()
 
-@app.get('/data_co_send_tokens/')
-async def data_co_send_tokens(co2: int, origin: str, token: str, lat: float, lon: float):
-    """
-    This function handles the data received from a CO2 sensor and sends tokens based on the received data.
-    It also logs the received data into a MySQL database.
-
-    Parameters:
-    co2 (int): The measured CO2 concentration in parts per million.
-    origin (str): The origin of the sensor data.
-    token (str): The token used to authenticate the request.
-    lat (float): The latitude of the sensor location.
-    lon (float): The longitude of the sensor location.
-
-    Returns:
-    bool: True if the data is successfully logged and tokens are sent.
-          False if the token is invalid.
-    """
-
-    with open('data_user.json') as f:
-        data_user = json.load(f)
-
-    data_points = int(data_user.get("data"))
-
-    print(data_user)
-
-    print(''.center(60, '='))
-    print(f"ppm co2: {co2} , origen: {origin}, lat: {lat}, lon: {lon}")
-
-    if token == TOKEN:
-
-        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
-                                ssh_username=SSH_USER,
-                                ssh_private_key_password=SSH_HOST_KEY,
-                                ssh_password=SSH_KEY_PATH,
-                                remote_bind_address=(DB_HOST, DB_PORT),
-                                local_bind_address=('127.0.0.1', 10022),
-                                mute_exceptions=True) as tunnel:
-            conn = pymysql.connect(host='127.0.0.1',
-                                   port=tunnel.local_bind_port,
-                                   user=DB_USER,
-                                   password=DB_PASSWORD,
-                                   db=DB_NAME)
-            with conn.cursor() as cursor:
-                count = cursor.execute(
-                    f"INSERT INTO {DB_NAME}.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
-                conn.commit()
-                print(f'Rows inserted: {str(count)}')
-
-        if data_points == 9:
-            amount = 1
-            tx = SendTk().send(wallet_to_send=SEND_WALLET, amount=amount)
-            if tx:
-                print(f'🤑 send {amount} to {SEND_WALLET} is: {tx}')
-                print(f'👌 data send sensor ok and co2 ok')
-            else:
-                print(f"😭 Transaction denied by network or insufficient gas")
-
-            data_points = {"user": "sensor03",
-                           "data": 0}
-
-            json_object = json.dumps(data_points, indent=4)
-
-            with open('data_user.json', "w") as outfile:
-                outfile.write(json_object)
-
-        else:
-            data_points = {"user": "sensor03",
-                           "data": f"{int(data_points + 1)}"}
-
-            json_object = json.dumps(data_points, indent=4)
-
-            with open('data_user.json', "w") as outfile:
-                outfile.write(json_object)
-
-            print("🔥 With 10 points send 1 Kii")
-
-        print(''.center(60, '='))
-
-    else:
-        print(f'Not valid token {token}')
-
-    return True
+    return {"status": "success", "message": "Telemetría recibida e indexada localmente"}
 
 
-@app.get('/data_co_send/')
-async def data_co_send(co2: int, origin: str, token: str, lat: float, lon: float):
-    """
-    This function handles the data received from a CO2 sensor and logs it into a MySQL database.
-    It also checks if the provided token is valid before proceeding with the logging process.
-
-    Parameters:
-    co2 (int): The measured CO2 concentration in parts per million.
-    origin (str): The origin of the sensor data.
-    token (str): The token used to authenticate the request.
-    lat (float): The latitude of the sensor location.
-    lon (float): The longitude of the sensor location.
-
-    Returns:
-    None: This function does not return any value. It logs the received data into the MySQL database.
-    """
-
-    print(''.center(60, '='))
-    print(f"ppm co2: {co2} , origen: {origin}, lat: {lat}, lon: {lon}")
-
-    if token == TOKEN:
-
-        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
-                                ssh_username=SSH_USER,
-                                ssh_private_key_password=SSH_HOST_KEY,
-                                ssh_password=SSH_KEY_PATH,
-                                remote_bind_address=(DB_HOST, DB_PORT),
-                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
-            conn = pymysql.connect(host='127.0.0.1',
-                                   port=tunnel.local_bind_port,
-                                   user=DB_USER,
-                                   password=DB_PASSWORD,
-                                   db=DB_NAME)
-            with conn.cursor() as cursor:
-                count = cursor.execute(
-                    f"INSERT INTO {DB_NAME}.co2Storage (co2, origin, date_c, lat, lon) VALUES ({co2}, '{origin}', CURRENT_TIMESTAMP, {lat}, {lon});")
-                conn.commit()
-                print(f'Rows inserted: {str(count)}')
-
-        print(''.center(60, '='))
-
-    else:
-        print(f'Not valid token {token}')
-
-
-@app.get('/query_co2/')
-async def query_co2(rows: int, token: str) -> JSONResponse:
-    """
-    This function retrieves the latest 'rows' number of records from the 'co2Storage' table in the MySQL database.
-    It uses an SSH tunnel to connect to the remote database server. The retrieved data is then converted to a JSON format
-    and returned as a JSONResponse.
-
-    Parameters:
-    rows (int): The number of records to retrieve from the database.
-    token (str): The token used to authenticate the request.
-
-    Returns:
-    JSONResponse: A JSONResponse containing the retrieved data from the 'co2Storage' table.
-    """
-    if token == TOKEN:
-
-        with SSHTunnelForwarder((SSH_HOST, SSH_PORT),
-                                ssh_username=SSH_USER,
-                                ssh_private_key_password=SSH_HOST_KEY,
-                                ssh_password=SSH_KEY_PATH,
-                                remote_bind_address=(DB_HOST, DB_PORT),
-                                local_bind_address=('127.0.0.1', 10022)) as tunnel:
-            conn = pymysql.connect(host='127.0.0.1',
-                                   port=tunnel.local_bind_port,
-                                   user=DB_USER,
-                                   password=DB_PASSWORD,
-                                   db=DB_NAME)
-            sql_query = f'SELECT * FROM {DB_NAME}.co2Storage ORDER BY date_c DESC LIMIT {rows}'
-            df = pd.read_sql(sql_query, conn)
-
-            json_output = df.to_dict()
-
-            print('OK')
-
-    else:
-        print(f'Not valid token {token}')
-
-    json_data = jsonable_encoder(json_output)
-
-    return JSONResponse(content=json_data)
-
-if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=8086)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8086))
+    host = os.environ.get("HOST", "0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, reload=True)
