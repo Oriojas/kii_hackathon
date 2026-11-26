@@ -15,9 +15,12 @@ Provee los dos escenarios oficiales del MVP:
 
 from __future__ import annotations
 
+import csv
 import math
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, List, Optional
 
@@ -289,6 +292,7 @@ def get_home_air_scenario(
 def get_business_scenario(
     *,
     variant: str = "eligible",
+    expired_calibration: bool = False,
     reference_time: Optional[datetime] = None,
     config: Optional[VeraConfig] = None,
 ) -> ScenarioBundle:
@@ -377,8 +381,17 @@ def get_business_scenario(
     )
 
     # Nivel 2: Calibración / validación metodológica de medidores
-    cal_dt = eval_dt - timedelta(hours=72)
-    expires_dt = eval_dt + timedelta(hours=max(24, cfg.max_calibration_age_hours - 72))
+    if expired_calibration or variant == "expired_calibration":
+        cal_dt = eval_dt - timedelta(hours=cfg.max_calibration_age_hours + 120)
+        expires_dt = eval_dt - timedelta(hours=24)
+        sensor_status = "EXPIRED"
+        cal_notes = "Calibración vencida: ventana de vigencia expirada en escenario empresarial."
+    else:
+        cal_dt = eval_dt - timedelta(hours=72)
+        expires_dt = eval_dt + timedelta(hours=max(24, cfg.max_calibration_age_hours - 72))
+        sensor_status = "SYNTHETIC_DECLARED"
+        cal_notes = "Factor de emisión de red declarado y medidores zonales verificados en escenario sintético."
+
     cal_node = graph.register_calibration(
         node_id=f"{graph_id}-calibration",
         parent_ids=[src_node.node_id],
@@ -386,9 +399,9 @@ def get_business_scenario(
         timestamp=cal_dt.isoformat(),
         calibrated_at=cal_dt.isoformat(),
         calibration_expires_at=expires_dt.isoformat(),
-        sensor_status="SYNTHETIC_DECLARED",
+        sensor_status=sensor_status,
         reference_baseline=sum(cfg.business_zone_baseline_kwh),
-        notes="Factor de emisión de red declarado y medidores zonales verificados en escenario sintético.",
+        notes=cal_notes,
     )
 
     # Nivel 3: Lote de lecturas zonales
@@ -480,5 +493,268 @@ def get_business_scenario(
             "total_units": round(total_units, 2),
             "intensity_kg_per_unit": round(overall_intensity, 6),
             "reduction_pct": round(overall_reduction_pct, 4),
+            "expired_calibration": expired_calibration or variant == "expired_calibration",
+            "calibrated_at": cal_dt.isoformat(),
+            "calibration_expires_at": expires_dt.isoformat(),
+        },
+    )
+
+
+def _resolve_imported_gps_csv_path(csv_path: Optional[str]) -> Path:
+    """Resuelve la ruta al archivo CSV+GPS importado desde parámetro o entorno."""
+    repo_root = Path(__file__).resolve().parent.parent
+    env_override = os.environ.get("VERA_IMPORTED_GPS_CSV_PATH", "").strip()
+    candidates: List[Path] = []
+    if csv_path:
+        p = Path(csv_path)
+        candidates.append(p if p.is_absolute() else (repo_root / p))
+        candidates.append(p)
+    elif env_override:
+        p = Path(env_override)
+        candidates.append(p if p.is_absolute() else (repo_root / p))
+    else:
+        candidates.append(repo_root / "tests" / "fixtures" / "sample_gps_mq135.csv")
+        candidates.append(repo_root / "hardware_files" / "Test_gps" / "data.csv")
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "No se encontró el archivo CSV+GPS importado en las rutas configuradas."
+    )
+
+
+def _parse_csv_timestamp(raw_date: str, fallback_dt: datetime) -> str:
+    """Normaliza la columna `date_c` del CSV o usa el timestamp determinista de respaldo."""
+    cleaned = raw_date.strip()
+    if not cleaned:
+        return fallback_dt.isoformat()
+    if cleaned.endswith("Z"):
+        cleaned = f"{cleaned[:-1]}+00:00"
+    try:
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+    except ValueError:
+        return fallback_dt.isoformat()
+
+
+def get_imported_gps_scenario(
+    csv_path: Optional[str] = None,
+    tampered: bool = False,
+    incomplete: bool = False,
+    expired_calibration: bool = False,
+    *,
+    variant: Optional[str] = None,
+    reference_time: Optional[datetime] = None,
+    config: Optional[VeraConfig] = None,
+) -> ScenarioBundle:
+    """Genera el escenario de datos importados CSV+GPS (`source_type='imported'`).
+
+    Lee `tests/fixtures/sample_gps_mq135.csv` (o `hardware_files/Test_gps/data.csv`),
+    conserva `lat`, `lon` y `raw_signal` (`co2`), marca explícitamente
+    `source_type='imported'` y construye el grafo de attestations de VERA.
+    """
+    cfg = config or VeraConfig.from_env()
+    eval_dt = _resolve_reference_time(cfg, reference_time)
+    eval_ts = eval_dt.isoformat()
+
+    is_tampered = tampered or variant == "tampered"
+    is_incomplete = incomplete or variant == "incomplete"
+    is_expired = expired_calibration or variant == "expired_calibration"
+
+    if variant:
+        resolved_variant = variant
+    elif is_tampered:
+        resolved_variant = "tampered"
+    elif is_incomplete:
+        resolved_variant = "incomplete"
+    elif is_expired:
+        resolved_variant = "expired_calibration"
+    else:
+        resolved_variant = "valid"
+
+    resolved_csv = _resolve_imported_gps_csv_path(csv_path)
+    full_readings: List[Dict[str, Any]] = []
+    with resolved_csv.open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+
+    if not rows:
+        raise ValueError(f"El archivo CSV importado está vacío: {resolved_csv}")
+
+    total_expected = len(rows)
+    start_dt = eval_dt - timedelta(minutes=cfg.home_air_interval_minutes * (total_expected - 1))
+
+    for idx, row in enumerate(rows):
+        fallback_dt = start_dt + timedelta(minutes=cfg.home_air_interval_minutes * idx)
+        ts = _parse_csv_timestamp(str(row.get("date_c") or ""), fallback_dt)
+        co2_raw = float(row["co2"])
+        lat = float(row["lat"])
+        lon = float(row["lon"])
+        origin = str(row.get("origin") or "sensor1").strip() or "sensor1"
+
+        entry: Dict[str, Any] = {
+            "seq": idx + 1,
+            "timestamp": ts,
+            "source_type": "imported",
+            "origin": origin,
+            "lat": lat,
+            "lon": lon,
+            "raw_signal": co2_raw,
+            "co2": co2_raw,
+            "unit": "adc_raw",
+            "sensor_model": cfg.home_sensor_model,
+            "is_certified_co2": False,
+        }
+        if row.get("co2_") not in (None, ""):
+            entry["co2_"] = float(row["co2_"])
+        full_readings.append(entry)
+
+    if is_incomplete:
+        keep_count = max(1, int(total_expected * max(0.25, cfg.min_coverage_ratio - 0.30)))
+        batch_readings = full_readings[:keep_count]
+    else:
+        batch_readings = full_readings
+
+    if is_expired:
+        calibrated_dt = eval_dt - timedelta(hours=cfg.max_calibration_age_hours + 120)
+        expires_dt = eval_dt - timedelta(hours=24)
+        sensor_status = "EXPIRED"
+        cal_notes = "Calibración vencida en lote importado CSV+GPS."
+    else:
+        calibrated_dt = eval_dt - timedelta(hours=48)
+        expires_dt = eval_dt + timedelta(hours=max(24, cfg.max_calibration_age_hours - 48))
+        sensor_status = "VALID"
+        cal_notes = "Calibración vigente declarada para lote histórico importado CSV+GPS."
+
+    lats = [float(r["lat"]) for r in batch_readings]
+    lons = [float(r["lon"]) for r in batch_readings]
+    raw_values = [float(r["raw_signal"]) for r in batch_readings]
+
+    graph_id = f"imported-gps-{resolved_variant}"
+    graph = AttestationGraph(graph_id=graph_id)
+    source_cls = "imported"
+
+    # Nivel 1: Fuente importada CSV+GPS
+    src_node = graph.register_device_source(
+        node_id=f"{graph_id}-source",
+        source_classification=source_cls,
+        timestamp=batch_readings[0]["timestamp"],
+        device_id=f"{cfg.home_device_id}-gps-import",
+        sensor_model=cfg.home_sensor_model,
+        firmware_or_generator="csv-gps-importer-v1",
+        location_label=f"gps-track ({min(lats):.4f},{min(lons):.4f})..({max(lats):.4f},{max(lons):.4f})",
+        declared_limitations=[
+            "Datos históricos importados desde archivo CSV con trazas GPS (source_type='imported').",
+            "La columna 'co2' corresponde a señal MQ-135 registrada en campo y no equivale a medición certificada.",
+        ],
+        extra_metadata={
+            "source_type": "imported",
+            "csv_filename": resolved_csv.name,
+            "lat_min": min(lats),
+            "lat_max": max(lats),
+            "lon_min": min(lons),
+            "lon_max": max(lons),
+        },
+    )
+
+    # Nivel 2: Calibración
+    cal_node = graph.register_calibration(
+        node_id=f"{graph_id}-calibration",
+        parent_ids=[src_node.node_id],
+        source_classification=source_cls,
+        timestamp=calibrated_dt.isoformat(),
+        calibrated_at=calibrated_dt.isoformat(),
+        calibration_expires_at=expires_dt.isoformat(),
+        sensor_status=sensor_status,
+        reference_baseline=cfg.home_air_baseline_raw,
+        notes=cal_notes,
+    )
+
+    # Nivel 3: Lote CSV+GPS
+    batch_node = graph.register_batch(
+        node_id=f"{graph_id}-batch",
+        parent_ids=[src_node.node_id, cal_node.node_id],
+        source_classification=source_cls,
+        timestamp=batch_readings[-1]["timestamp"],
+        readings=batch_readings,
+        expected_count=total_expected,
+        unit="adc_raw",
+    )
+
+    # Nivel 4: Dataset agregado
+    coverage_ratio = len(batch_readings) / total_expected
+    dataset_node = graph.register_dataset(
+        node_id=f"{graph_id}-dataset",
+        parent_ids=[batch_node.node_id],
+        source_classification=source_cls,
+        timestamp=eval_ts,
+        aggregation_window=f"{total_expected * cfg.home_air_interval_minutes}m",
+        reading_count=len(batch_readings),
+        expected_count=total_expected,
+        coverage_ratio=coverage_ratio,
+        mean_value=mean(raw_values),
+        min_value=min(raw_values),
+        max_value=max(raw_values),
+    )
+
+    # Nivel 5: Análisis / Cálculo sobre trayectoria GPS
+    baseline_avg = mean(raw_values[: max(1, len(raw_values) // 4)])
+    peak_val = max(raw_values)
+    recovery_avg = mean(raw_values[-max(1, len(raw_values) // 4) :])
+    anomaly_detected = peak_val >= cfg.home_air_anomaly_min_raw
+    anomaly_mitigated = anomaly_detected and recovery_avg <= cfg.home_air_recovery_max_raw
+    improvement_pct = ((peak_val - recovery_avg) / peak_val * 100.0) if peak_val > 0 else 0.0
+
+    graph.register_analysis(
+        node_id=f"{graph_id}-analysis",
+        parent_ids=[dataset_node.node_id],
+        source_classification=source_cls,
+        timestamp=eval_ts,
+        methodology="imported_gps_mq135_track_v1",
+        baseline_value=baseline_avg,
+        peak_value=peak_val,
+        recovery_value=recovery_avg,
+        anomaly_detected=anomaly_detected,
+        anomaly_mitigated=anomaly_mitigated,
+        improvement_pct=improvement_pct,
+        extra_metrics={
+            "source_type": "imported",
+            "is_certified_co2": False,
+            "unit": "adc_raw",
+            "gps_points": len(batch_readings),
+            "lat_center": round(mean(lats), 6),
+            "lon_center": round(mean(lons), 6),
+        },
+    )
+
+    expected_root = graph.build_evidence_tree(max_level=AttestationLevel.ANALYSIS).evidence_root
+
+    if is_tampered:
+        batch_node.payload["readings"][0]["raw_signal"] = 1.0
+
+    return ScenarioBundle(
+        scenario_type="imported_gps",
+        variant=resolved_variant,
+        source_classification=source_cls,
+        evaluation_timestamp=eval_ts,
+        expected_evidence_root=expected_root,
+        graph=graph,
+        readings=batch_node.payload["readings"],
+        zones=[],
+        metadata={
+            "source_type": "imported",
+            "csv_path": str(resolved_csv),
+            "device_id": f"{cfg.home_device_id}-gps-import",
+            "sensor_model": cfg.home_sensor_model,
+            "is_certified_co2": False,
+            "expired_calibration": is_expired,
+            "calibrated_at": calibrated_dt.isoformat(),
+            "calibration_expires_at": expires_dt.isoformat(),
+            "gps_points": len(batch_node.payload["readings"]),
+            "lat_center": round(mean(lats), 6),
+            "lon_center": round(mean(lons), 6),
         },
     )

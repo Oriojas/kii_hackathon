@@ -38,6 +38,7 @@ from vera_core.scenarios import (
     ScenarioBundle,
     get_business_scenario,
     get_home_air_scenario,
+    get_imported_gps_scenario,
 )
 
 __all__ = [
@@ -66,6 +67,7 @@ __all__ = [
     "compute_policy_hash",
     "get_business_scenario",
     "get_home_air_scenario",
+    "get_imported_gps_scenario",
     "sha256_hex",
     "verify_merkle_proof",
 ]

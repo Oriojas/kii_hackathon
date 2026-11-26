@@ -144,6 +144,14 @@ class PolicyEngine:
                 "max_intensity_kg_per_unit": self.config.business_max_intensity_kg_per_unit,
                 "min_reduction_pct": self.config.business_min_reduction_pct,
             })
+        elif scenario_type == "imported_gps":
+            base_params.update({
+                "source_classification": "imported",
+                "require_recovery_for_anomaly": self.config.require_recovery_for_anomaly,
+                "baseline_max_raw": self.config.home_air_baseline_max_raw,
+                "anomaly_min_raw": self.config.home_air_anomaly_min_raw,
+                "recovery_max_raw": self.config.home_air_recovery_max_raw,
+            })
         else:
             raise ValueError(f"Escenario no soportado por PolicyEngine: {scenario_type!r}")
         return base_params
@@ -158,6 +166,9 @@ class PolicyEngine:
         dataset_nodes = graph.get_nodes_by_level(AttestationLevel.DATASET)
         if dataset_nodes and "zones_summary" in dataset_nodes[0].payload:
             return "business"
+        source_nodes = graph.get_nodes_by_level(AttestationLevel.DEVICE_SOURCE)
+        if source_nodes and source_nodes[0].source_classification == "imported":
+            return "imported_gps"
         return "home_air"
 
     def _collect_source_classification(self, graph: AttestationGraph) -> str:
@@ -399,7 +410,7 @@ class PolicyEngine:
             "improvement_pct": ap.get("improvement_pct"),
         }
 
-        if scenario_type == "home_air":
+        if scenario_type in {"home_air", "imported_gps"}:
             peak = float(ap.get("peak_value", 0.0))
             recovery = float(ap.get("recovery_value", 0.0))
             improvement = float(ap.get("improvement_pct", 0.0))

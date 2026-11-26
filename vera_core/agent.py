@@ -137,6 +137,12 @@ class VeraAgent:
                 "Una attestation verifica autoría e integridad del contenido, pero no convierte datos "
                 "sintéticos en mediciones físicas ni sustituye auditorías o verificadores acreditados."
             )
+        if source_classification == "imported" or scenario_type == "imported_gps":
+            return (
+                "Este reporte utiliza datos históricos importados (CSV+GPS, source_type='imported') "
+                "con señal MQ-135 geolocalizada; no constituyen mediciones certificadas de CO2 ni "
+                "reemplazan auditorías ambientales acreditadas."
+            )
         if scenario_type == "home_air":
             return (
                 "Las lecturas provienen de un sensor MQ-135 reportadas como señal analógica cruda (ADC) "
@@ -154,16 +160,19 @@ class VeraAgent:
         graph: Optional[AttestationGraph] = None,
     ) -> str:
         """Explica en lenguaje natural (español) la decisión emitida por el `PolicyEngine`."""
-        etiqueta_origen = (
-            "datos sintéticos declarados"
-            if evaluation.source_classification == "synthetic_declared"
-            else "sensor físico"
-        )
-        escenario_es = (
-            "calidad de aire en hogar (MQ-135 señal cruda)"
-            if evaluation.scenario_type == "home_air"
-            else "operación empresarial multi-zona (Scope 2)"
-        )
+        if evaluation.source_classification == "synthetic_declared":
+            etiqueta_origen = "datos sintéticos declarados"
+        elif evaluation.source_classification == "imported":
+            etiqueta_origen = "datos importados CSV+GPS"
+        else:
+            etiqueta_origen = "sensor físico"
+
+        if evaluation.scenario_type == "home_air":
+            escenario_es = "calidad de aire en hogar (MQ-135 señal cruda)"
+        elif evaluation.scenario_type == "imported_gps":
+            escenario_es = "trayectoria móvil importada (CSV + GPS + MQ-135)"
+        else:
+            escenario_es = "operación empresarial multi-zona (Scope 2)"
 
         status_intro = {
             STATUS_ELIGIBLE: (
@@ -190,7 +199,7 @@ class VeraAgent:
             f"evidence_root={evaluation.evidence_root[:16]}...",
         ]
 
-        if evaluation.scenario_type == "home_air" and evaluation.metrics:
+        if evaluation.scenario_type in {"home_air", "imported_gps"} and evaluation.metrics:
             peak = evaluation.metrics.get("peak_value")
             recovery = evaluation.metrics.get("recovery_value")
             baseline = evaluation.metrics.get("baseline_value")
@@ -259,7 +268,7 @@ class VeraAgent:
                     "idempotency_key único."
                 )
 
-        if evaluation.scenario_type == "home_air":
+        if evaluation.scenario_type in {"home_air", "imported_gps"}:
             if evaluation.status == STATUS_BLOCKED and evaluation.metrics.get("anomaly_detected"):
                 actions.extend([
                     "Activar ventilación cruzada o extracción mecánica inmediata hasta reducir la señal "
