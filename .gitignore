@@ -161,3 +161,43 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 /hardware_files/Test_gps/data.csv
+/docs
+# ==========================================
+# VERA-CONCORDIUM Project Specific Ignores
+# ==========================================
+
+# Environment and sensitive credential files
+.env
+.env.local
+.env.*.local
+*.export
+*.pem
+*.key
+keys/
+/hardware_files/co2GpsSensor/env.h
+
+# Node / Concordium Bridge
+node_modules/
+concordium-bridge/node_modules/
+concordium-bridge/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Rust / Concordium Smart Contracts
+contracts/target/
+contracts/**/target/
+target/
+*.wasm
+*.wasm.v1
+
+# Databases and Local Storage
+*.db
+*.sqlite
+*.sqlite3
+vera_storage.db
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/

@@ -1,0 +1,12 @@
+[package]
+name = "evidence_registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "VERA Evidence Registry smart contract for Concordium"
+
+[dependencies]
+concordium-std = "11"
+
+[lib]
+crate-type = ["cdylib", "rlib"]

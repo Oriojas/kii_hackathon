@@ -1,0 +1,26 @@
+{
+  "name": "vera-concordium-bridge",
+  "version": "0.1.0",
+  "description": "Node.js / TypeScript bridge for VERA on Concordium (canonical hashing, CIS-8004, CIS-8, gRPC client)",
+  "private": true,
+  "type": "module",
+  "main": "dist/client.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test:vectors": "tsx src/test_vectors.ts",
+    "dev": "tsx src/test_vectors.ts",
+    "deploy:testnet": "tsx src/deploy.ts",
+    "onboard:testnet": "tsx src/onboard_testnet.ts",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@concordium/web-sdk": "^8.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,182 +1,1209 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <title>KiiGuardian</title>
-  <link href="{{ url_for('css', path='/style.css') }}" rel="stylesheet">
-</head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VERA - Agente Ambiental Verificable | Concordium Trusted Agents</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a1118;
+            --bg-deeper: #060b10;
+            --card-bg: #111d27;
+            --card-elevated: #172635;
+            --card-border: #1d2e3d;
+            --accent-green: #00d293;
+            --accent-green-dark: #00a876;
+            --accent-blue: #0099ff;
+            --accent-red: #ff4d6d;
+            --accent-amber: #f59e0b;
+            --accent-purple: #a855f7;
+            --text-main: #e2e8f0;
+            --text-muted: #8e9cae;
+        }
+        body {
+            background: radial-gradient(circle at top right, rgba(0, 153, 255, 0.08), transparent 45%),
+                        radial-gradient(circle at top left, rgba(0, 210, 147, 0.07), transparent 40%),
+                        var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+        }
+        .navbar-custom {
+            background-color: rgba(17, 29, 39, 0.95);
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+        }
+        .badge-verified {
+            background: linear-gradient(135deg, #00d293 0%, #00a876 100%);
+            color: #032014;
+            font-weight: 700;
+            padding: 0.38rem 0.85rem;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .badge-simulated-cis {
+            background: linear-gradient(135deg, rgba(0, 210, 147, 0.22) 0%, rgba(0, 153, 255, 0.22) 100%);
+            color: #5eead4;
+            border: 1px solid rgba(0, 210, 147, 0.55);
+            font-weight: 700;
+            padding: 0.38rem 0.85rem;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .badge-unverified {
+            background: rgba(255, 77, 109, 0.16);
+            color: #ff8fa3;
+            border: 1px solid rgba(255, 77, 109, 0.5);
+            font-weight: 700;
+            padding: 0.38rem 0.85rem;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+        }
+        .dashboard-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.35rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            margin-bottom: 1.25rem;
+        }
+        .kpi-box {
+            background-color: var(--card-elevated);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 0.95rem;
+            height: 100%;
+        }
+        .kpi-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            margin-bottom: 0.2rem;
+        }
+        .kpi-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+        .step-node {
+            background-color: var(--card-elevated);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.8rem 0.95rem;
+            margin-bottom: 0.7rem;
+            transition: border-color 0.2s ease, transform 0.15s ease;
+            cursor: pointer;
+        }
+        .step-node:hover {
+            border-color: var(--accent-green);
+        }
+        .step-node.expanded {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 1px rgba(0, 153, 255, 0.25);
+        }
+        .step-node-pending {
+            background-color: rgba(23, 38, 53, 0.45);
+            border: 1px dashed #2b4257;
+            border-radius: 10px;
+            padding: 0.65rem 0.95rem;
+            margin-bottom: 0.6rem;
+            color: var(--text-muted);
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background-color: var(--accent-green);
+            color: #031510;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: 800;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .step-number-settlement {
+            background-color: var(--accent-blue);
+            color: #041320;
+        }
+        .step-number-pending {
+            background-color: #26394b;
+            color: var(--text-muted);
+        }
+        .node-details {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.8rem;
+        }
+        .node-json-pre {
+            background-color: var(--bg-deeper);
+            border: 1px solid #1e3142;
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: #93c5fd;
+            font-size: 0.74rem;
+            max-height: 240px;
+            overflow-y: auto;
+            margin-top: 0.4rem;
+            margin-bottom: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .status-badge {
+            font-size: 0.78rem;
+            padding: 0.32rem 0.7rem;
+            border-radius: 6px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+        .status-eligible { background-color: rgba(0, 210, 147, 0.18); color: #00d293; border: 1px solid #00d293; }
+        .status-blocked { background-color: rgba(255, 77, 109, 0.18); color: #ff4d6d; border: 1px solid #ff4d6d; }
+        .status-incomplete { background-color: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid #f59e0b; }
+        .status-tampered { background-color: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid #a855f7; }
 
+        .btn-tab-custom {
+            background: var(--card-elevated);
+            color: var(--text-muted);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.15s ease;
+        }
+        .btn-tab-custom:hover {
+            color: #fff;
+            border-color: var(--accent-blue);
+        }
+        .btn-tab-custom.active {
+            background: linear-gradient(135deg, var(--accent-green) 0%, #00b881 100%);
+            color: #061410;
+            border-color: var(--accent-green);
+        }
+        .demo-btn {
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+        .demo-btn.active-demo {
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+        .check-item {
+            background-color: var(--bg-deeper);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.82rem;
+        }
+        .hash-mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            word-break: break-all;
+        }
+        .concordium-pill {
+            background-color: var(--card-elevated);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.4rem 0.7rem;
+            font-size: 0.78rem;
+        }
+        .settle-box {
+            background-color: var(--bg-deeper);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+        .honest-notice {
+            background-color: rgba(0, 153, 255, 0.08);
+            border: 1px solid rgba(0, 153, 255, 0.3);
+            border-radius: 8px;
+            padding: 0.7rem 0.9rem;
+            font-size: 0.82rem;
+            color: #bae6fd;
+        }
+    </style>
+</head>
 <body>
 
-  <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">KiiGuardian</a>
-    <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#">Kickin' It With KiiChain</a>
-    <button id="connectButton" class="btn btn-primary">Connect to MetaMask</button>
-    <button id="disconnectButton" class="btn btn-danger" style="display: none;">Disconnect</button>
-  </header>
-
-  <div class="container-fluid">
-    <div class="row">
-      <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-        <div class="position-sticky pt-3 sidebar-sticky">
-          <ul class="nav flex-column">
-            <div class="container-fluid">
-              <br>
-              <p class="text-break">
-                KiiGuardian is a blockchain-based project that uses sensors to measure CO2 emissions and GPS to track
-                their location. The data collected by KiiGuardian is used to create a map of CO2 emissions around the
-                world. This map is then used to raise awareness of the issue of climate change and motivate people to
-                reduce their carbon footprint.
-              </p>
+    <!-- Barra de Navegación -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top py-3">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="bi bi-shield-lock-fill text-success"></i>
+                <span class="fs-4 fw-bold text-white">VERA</span>
+                <span class="text-muted fs-6 d-none d-sm-inline">| Auditoría Verificable · Concordium Trusted Agents</span>
+            </a>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span id="cis8004Badge" class="badge-simulated-cis" title="Estado CIS-8004 en vivo desde /api/concordium/status">
+                    <i class="bi bi-hourglass-split"></i> Verificando Concordium...
+                </span>
+                <a href="/.well-known/agent-card.json" target="_blank" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-filetype-json"></i> Agent Card (CIS-8004)
+                </a>
             </div>
-            <div class="row" style="padding-left: 15px">
-              <div class="col">
-                <img src="{{ url_for('img', path='/KiiGuardian.png') }}" height="100px" alt="logo_hack">
-              </div>
-              <div class="col">
-                <img src="img/Kiichainlogo.png" class="rounded mx-auto d-block" height="118px" alt="Kii">
-              </div>
-            </div>
-            <div class="container-fluid">
-              <h4 class="sidebar-heading d-flex justify-content-between mt-4 mb-1 text-muted text-uppercase">
-                Wallet Pool Reward:
-              </h4>
-              <p class="text-break">
-                0x48e72B52c0858E5dAb8b446A8399309C19a99F63
-              </p>
-            </div>
-            <div class="container-fluid">
-              <h4 class="sidebar-heading d-flex justify-content-between mt-4 mb-1 text-muted text-uppercase">
-                Wallet Reward:
-              </h4>
-              <p class="text-break" id="walletAddress">
-              </p>
-            </div>
-          </ul>
         </div>
-      </nav>
+    </nav>
 
-      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-        <br>
-        <h4 class="h4">Dashboard</h4>
+    <!-- Contenido Principal -->
+    <div class="container-fluid px-4 py-4">
 
-        <div class="mb-3 border rounded" style='padding: 16px;'>
-          <div id='divPlotly'>
-            <script>
-              {{plot | safe}}
-              Plotly.react('divPlotly', plotly_data.data, plotly_data.layout);
-            </script>
-          </div>
-        </div>
-
-        <div class="mb-3 border rounded" style='padding: 10px;'>
-          <div class="container text-start" style='padding: 10px;'>
-            <div class="row">
-              <div class="col" style='padding: 4px;'>
-                <h4 class="h4">¿How it works?</h4>
-                <p class="text-start">
-                  KiiGuardian is a blockchain-based project that uses an IoT device to measure the concentration of
-                  carbon monoxide (CO2) and track CO2 emissions in different locations. The solution works in four key
-                  steps:
-                  IoT device: KiiGuardian uses an IoT device to measure the concentration of CO2. This device can be
-                  installed in various locations, such as homes, offices, cars, bicycles, and other places.
-                  Connection to the blockchain network: Once the IoT device is installed, it is connected to the
-                  blockchain network to perform transactions. The blockchain network is a decentralized and secure
-                  database that records all transactions made.
-                  Measurement and tracking of CO2 emissions: The IoT device measures the concentration of CO2 and tracks
-                  CO2 emissions in different locations. The collected data is used to create a map of CO2 concentration
-                  around the world, which helps raise awareness about the problem of climate change and motivates people
-                  to reduce their carbon footprint.
-                  Reward system: KiiGuardian uses a reward system to incentivize users to reduce their carbon footprint.
-                  When users manage to reduce their CO2 emissions below a specific target, it will deduct from the grant
-                  account to the stake account. Users receive tokens as a reward for reducing their carbon footprint.
-                  for contact:
-                  <a href="mailto:jhonteajada95@gmail.com">Jhon Tejada</a>, <a href="mailto:oscarriojas@gmail.com">Oscar
-                    Riojas</a>, <a href="mailto:luisf.maring0910@gmail.com">Luis Felipe Marin</a>, check repo in <a
-                    href="https://github.com/Oriojas/kii_hackathon.git">CO2_KiiGuardian</a>
-                </p>
-              </div>
-              <div class="col" style='padding: 0px;'>
-                <h4 class="h4">Georeferencing</h4>
-                <div id='divPlotly2'>
-                  <script>
-                    {{plot2 | safe}}
-                    Plotly.react('divPlotly2', plotly_data2.data, plotly_data2.layout);
-                  </script>
+        <!-- Banner de Identidad On-Chain & Estado Concordium en Vivo -->
+        <div class="dashboard-card border-success border-opacity-25">
+            <div class="row align-items-center g-3">
+                <div class="col-lg-6">
+                    <h4 class="fw-bold mb-1">
+                        <i class="bi bi-cpu text-success"></i> {{ agent_name or 'VERA Environmental Agent' }}
+                    </h4>
+                    <p class="text-muted mb-2 small">
+                        Transforma telemetría física MQ-135, rutas GPS importadas y escenarios empresariales en evidencia criptográfica de 7 niveles, decisiones deterministas y liquidaciones auditables en Concordium.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2" id="concordiumStatusBar">
+                        <span class="concordium-pill text-muted">
+                            <i class="bi bi-diagram-2 text-info"></i> Red: <strong id="ccNetwork" class="text-light">cargando...</strong>
+                        </span>
+                        <span class="concordium-pill text-muted">
+                            <i class="bi bi-broadcast text-success"></i> Modo Bridge: <strong id="ccMode" class="text-light">...</strong>
+                        </span>
+                        <span class="concordium-pill text-muted">
+                            <i class="bi bi-hdd-network text-info"></i> Nodo gRPC: <strong id="ccGrpc" class="text-light">...</strong>
+                        </span>
+                        <span class="concordium-pill text-muted">
+                            <i class="bi bi-boxes text-warning"></i> Bloque: <strong id="ccBlock" class="text-light">-</strong>
+                        </span>
+                    </div>
                 </div>
-              </div>
+                <div class="col-lg-6">
+                    <div class="row g-2 text-start text-lg-end">
+                        <div class="col-sm-6 col-md-3 col-lg-6">
+                            <div class="concordium-pill">
+                                <span class="text-muted d-block">Evidence Registry</span>
+                                <code class="text-info">{{ evidence_registry_index }}.0</code>
+                                <span id="ccContractEvidence" class="ms-1 badge bg-secondary">...</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3 col-lg-6">
+                            <div class="concordium-pill">
+                                <span class="text-muted d-block">Reward Pool</span>
+                                <code class="text-info">{{ reward_pool_index }}.0</code>
+                                <span id="ccContractReward" class="ms-1 badge bg-secondary">...</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3 col-lg-6">
+                            <div class="concordium-pill">
+                                <span class="text-muted d-block">CIS-8004 Identity</span>
+                                <code class="text-info">{{ cis8004_index }}.0</code>
+                                <span id="ccContractCis8004" class="ms-1 badge bg-secondary">...</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3 col-lg-6">
+                            <div class="concordium-pill">
+                                <span class="text-muted d-block">CIS-8 Key Link</span>
+                                <code class="text-info">{{ cis8_index }}.0</code>
+                                <span id="ccContractCis8" class="ms-1 badge bg-secondary">...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2 small text-muted text-lg-end hash-mono">
+                        Cuenta Agente: <code class="text-light" id="ccAgentAccount">{{ agent_account or 'No configurada' }}</code>
+                        <span class="ms-2">· Hash Agent Card: <code class="text-info" id="ccCardHash">-</code></span>
+                    </div>
+                </div>
             </div>
-          </div>
         </div>
-      </main>
 
+        <!-- Selector de Escenario (4 Pestañas) y 4 Botones de Demostración para el Jurado -->
+        <div class="dashboard-card py-3">
+            <div class="row g-3 align-items-center">
+                <div class="col-xl-7">
+                    <div class="small text-muted mb-1 fw-semibold">
+                        <i class="bi bi-layers"></i> Escenarios de Auditoría
+                    </div>
+                    <div class="d-flex flex-wrap gap-2" role="group" aria-label="Pestañas de escenario">
+                        <button id="tab-home_air" class="btn btn-tab-custom active px-3 py-2" onclick="selectScenario('home_air')">
+                            <i class="bi bi-house-door"></i> Vera Home Air (MQ-135 Físico/Simulado)
+                        </button>
+                        <button id="tab-business" class="btn btn-tab-custom px-3 py-2" onclick="selectScenario('business')">
+                            <i class="bi bi-building"></i> Vera Business (4 Zonas Sintéticas)
+                        </button>
+                        <button id="tab-imported_gps" class="btn btn-tab-custom px-3 py-2" onclick="selectScenario('imported_gps')">
+                            <i class="bi bi-geo-alt"></i> Datos Importados (CSV + GPS Bogotá)
+                        </button>
+                        <button id="tab-live_telemetry" class="btn btn-tab-custom px-3 py-2" onclick="selectScenario('live_telemetry')">
+                            <i class="bi bi-cpu"></i> Sensor Físico en Vivo (ESP8266 / SQLite)
+                        </button>
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="small text-muted mb-1 fw-semibold text-xl-end">
+                        <i class="bi bi-sliders"></i> Casos de Demostración para el Jurado
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 justify-content-xl-end">
+                        <button id="demo-valid" class="btn btn-outline-success btn-sm demo-btn active-demo" onclick="selectDemoMode('valid')">
+                            <i class="bi bi-check-circle"></i> Ruta Válida (ELIGIBLE)
+                        </button>
+                        <button id="demo-blocked" class="btn btn-outline-danger btn-sm demo-btn" onclick="selectDemoMode('blocked')">
+                            <i class="bi bi-shield-x"></i> Calibración Vencida / Replay (BLOCKED)
+                        </button>
+                        <button id="demo-incomplete" class="btn btn-outline-warning btn-sm demo-btn" onclick="selectDemoMode('incomplete')">
+                            <i class="bi bi-exclamation-triangle"></i> Lote Incompleto (INCOMPLETE)
+                        </button>
+                        <button id="demo-tampered" class="btn btn-sm demo-btn" style="border-color: #a855f7; color: #d8b4fe;" onclick="selectDemoMode('tampered')">
+                            <i class="bi bi-bug"></i> Evidencia Manipulada (TAMPERED)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuadrícula Principal -->
+        <div class="row">
+            <!-- Columna Izquierda: Telemetría, Mapa GPS, Análisis Explicable y Liquidación -->
+            <div class="col-lg-7">
+                <div class="dashboard-card">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h5 class="fw-bold mb-1" id="plotTitle">Telemetría y Línea Base</h5>
+                            <div class="d-flex flex-wrap align-items-center gap-2 small text-muted">
+                                <span>Origen: <span id="sourceClassBadge" class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-50">-</span></span>
+                                <span>Variante: <code id="variantLabel" class="text-light">-</code></span>
+                            </div>
+                        </div>
+                        <span id="evaluationStatus" class="status-badge status-eligible">EVALUANDO</span>
+                    </div>
+
+                    <!-- KPIs reales del escenario -->
+                    <div class="row g-2 mb-3" id="kpiRow"></div>
+
+                    <!-- Gráfico Principal Plotly (datos reales) -->
+                    <div id="plotlyDiv" style="height: 360px;"></div>
+
+                    <!-- Mapa GPS Interactivo Plotly (Datos Importados CSV + GPS o Telemetría en Vivo con GPS) -->
+                    <div id="gpsMapContainer" class="d-none mt-4">
+                        <div id="gpsMapSection">
+                            <hr class="border-secondary opacity-25 my-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold mb-0">
+                                    <i class="bi bi-map text-success"></i> Mapa Interactivo de Trayectoria GPS
+                                </h6>
+                                <span class="small text-muted" id="gpsPointCount">-</span>
+                            </div>
+                            <div id="plotlyMapDiv" style="height: 380px;"></div>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary opacity-25 my-4">
+
+                    <!-- Alcance Honesto y Explicación del Agente -->
+                    <div id="honestScopeNotice" class="honest-notice mb-3"></div>
+
+                    <h5 class="fw-bold mb-2">
+                        <i class="bi bi-chat-left-dots text-info"></i> Explicación y Dictamen del Agente VERA
+                    </h5>
+                    <div class="p-3 rounded bg-dark border border-secondary border-opacity-25 mb-3">
+                        <p id="agentExplanation" class="mb-2 text-light small">Cargando análisis del agente...</p>
+                        <div id="agentMitigations" class="small text-muted"></div>
+                    </div>
+
+                    <!-- Verificaciones Deterministas del PolicyEngine -->
+                    <h6 class="fw-bold mb-2">
+                        <i class="bi bi-clipboard2-check text-success"></i> Reglas Verificadas por PolicyEngine
+                    </h6>
+                    <div id="policyChecksList" class="d-flex flex-column gap-2 mb-3"></div>
+
+                    <!-- Huellas Criptográficas -->
+                    <div class="row g-2 small text-muted hash-mono">
+                        <div class="col-md-6">
+                            <div class="check-item">
+                                <span class="text-muted d-block">Policy Hash:</span>
+                                <span id="policyHashValue" class="text-info">-</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="check-item">
+                                <span class="text-muted d-block">Evidence Root:</span>
+                                <span id="evidenceRootValue" class="text-success">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Liquidación Concordium + Inspector del Grafo de 7 Niveles -->
+            <div class="col-lg-5">
+                <!-- Tarjeta de Liquidación en Concordium -->
+                <div class="dashboard-card border-info border-opacity-25">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-currency-exchange text-info"></i> Liquidación en Concordium
+                        </h5>
+                        <button id="btnSettle" class="btn btn-success btn-sm fw-bold px-3 py-2" onclick="executeSettlement()">
+                            <i class="bi bi-send-check"></i> Ejecutar / Simular Liquidación en Concordium
+                        </button>
+                    </div>
+                    <div id="settlementResultBox" class="settle-box small text-muted">
+                        Selecciona un escenario y caso de demostración, luego pulsa el botón para evaluar la política determinista y ejecutar o simular la liquidación on-chain vía <code>POST /api/settle</code>.
+                    </div>
+                </div>
+
+                <!-- Inspector Interactivo del Grafo de Attestations (7 Niveles) -->
+                <div class="dashboard-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold mb-0">
+                            <i class="bi bi-diagram-3 text-success"></i> Inspector de Attestations
+                        </h5>
+                        <span class="badge bg-secondary" id="lineageCountBadge">0 / 7 Niveles</span>
+                    </div>
+                    <p class="small text-muted mb-3">
+                        Haz clic en cualquier nivel para inspeccionar <code>hash</code>, <code>parent_hash</code>, <code>timestamp</code> y el <code>payload</code> JSON completo.
+                    </p>
+                    <div id="lineageContainer" style="max-height: 760px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
+    <script>
+        let currentScenario = 'home_air';
+        let currentDemoMode = 'valid';
+        let expandedNodes = new Set();
+        let currentEvidenceId = null;
 
+        const SCENARIO_ENDPOINTS = {
+            home_air: '/api/scenarios/home-air',
+            business: '/api/scenarios/business',
+            imported_gps: '/api/scenarios/imported-gps',
+            live_telemetry: '/api/scenarios/live-telemetry'
+        };
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-  <script src="https://c0f4f41c-2f55-4863-921b-sdk-docs.github.io/cdn/metamask-sdk.js"></script>
-  <script>
-    const MMSDK = new MetaMaskSDK.MetaMaskSDK({
-      dappMetadata: {
-        name: "KiiGuardian",
-        url: window.location.href,
-      }
-    });
+        const LEVEL_LABELS_ES = {
+            1: 'Dispositivo / Fuente',
+            2: 'Calibración y Vigencia',
+            3: 'Lote de Telemetría',
+            4: 'Dataset Agregado',
+            5: 'Análisis y Anomalías',
+            6: 'Decisión de Política',
+            7: 'Liquidación en Concordium'
+        };
 
-    const connectButton = document.getElementById('connectButton');
-    const disconnectButton = document.getElementById('disconnectButton');
-    const walletAddressElement = document.getElementById('walletAddress');
-
-    const updateWalletAddress = (address) => {
-      walletAddressElement.textContent = address || "No wallet connected";
-    };
-
-    const checkConnection = async () => {
-      const ethereum = MMSDK.getProvider();
-      try {
-        const accounts = await ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          // Ya hay una cuenta conectada
-          connectButton.style.display = 'none';
-          disconnectButton.style.display = 'inline-block';
-          updateWalletAddress(accounts[0]);
-          console.log('Already connected account:', accounts[0]);
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
-      } catch (error) {
-        console.error('Error checking MetaMask connection', error);
-      }
-    };
 
-    connectButton.addEventListener('click', () => {
-      const ethereum = MMSDK.getProvider();
-      ethereum.request({ method: 'eth_requestAccounts' })
-        .then(accounts => {
-          console.log('Connected account:', accounts[0]);
-          connectButton.style.display = 'none';
-          disconnectButton.style.display = 'inline-block';
-          updateWalletAddress(accounts[0]);
-        })
-        .catch(error => {
-          console.error('Error connecting to MetaMask', error);
+        function shortHash(hash, len = 14) {
+            if (!hash) return 'N/A';
+            return hash.length > len ? `${hash.slice(0, len)}...` : hash;
+        }
+
+        function formatShortTime(isoStr) {
+            if (!isoStr) return '';
+            const d = new Date(isoStr);
+            if (Number.isNaN(d.getTime())) return String(isoStr);
+            return d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+        }
+
+        function getDemoFlags(mode = currentDemoMode) {
+            return {
+                expired: mode === 'blocked',
+                replay: mode === 'blocked',
+                incomplete: mode === 'incomplete',
+                tampered: mode === 'tampered'
+            };
+        }
+
+        function updateActiveButtons() {
+            ['home_air', 'business', 'imported_gps', 'live_telemetry'].forEach(sc => {
+                const btn = document.getElementById(`tab-${sc}`);
+                if (btn) btn.classList.toggle('active', sc === currentScenario);
+            });
+            ['valid', 'blocked', 'incomplete', 'tampered'].forEach(mode => {
+                const btn = document.getElementById(`demo-${mode}`);
+                if (btn) btn.classList.toggle('active-demo', mode === currentDemoMode);
+            });
+        }
+
+        function selectScenario(scenario) {
+            currentScenario = scenario;
+            currentEvidenceId = null;
+            expandedNodes.clear();
+            resetSettlementPrompt();
+            loadScenario();
+        }
+
+        function selectDemoMode(mode) {
+            currentDemoMode = mode;
+            currentEvidenceId = null;
+            expandedNodes.clear();
+            resetSettlementPrompt();
+            loadScenario();
+        }
+
+        function resetSettlementPrompt() {
+            const box = document.getElementById('settlementResultBox');
+            box.className = 'settle-box small text-muted';
+            box.innerHTML = 'Listo para liquidar o simular este escenario vía <code>POST /api/settle</code>. En casos <strong>ELIGIBLE</strong> se emitirá o simulará la transacción; un segundo envío consecutivo activará protección anti-replay.';
+        }
+
+        async function loadConcordiumStatus() {
+            const badge = document.getElementById('cis8004Badge');
+            try {
+                const res = await fetch('/api/concordium/status');
+                const data = await res.json();
+
+                const cisBadge = data.cis8004_badge || {};
+                const grpc = data.grpc || {};
+                const contracts = data.contracts || {};
+
+                if (cisBadge.on_chain_verified) {
+                    badge.className = 'badge-verified';
+                    badge.innerHTML = '<i class="bi bi-shield-check"></i> Verified by Concordium (On-Chain)';
+                } else if (cisBadge.verified) {
+                    badge.className = 'badge-simulated-cis';
+                    badge.innerHTML = '<i class="bi bi-patch-check"></i> Verified by Concordium (CIS-8004 · Modo Simulado)';
+                } else {
+                    badge.className = 'badge-unverified';
+                    badge.innerHTML = '<i class="bi bi-shield-exclamation"></i> CIS-8004 Sin Verificar';
+                }
+
+                document.getElementById('ccNetwork').innerText = data.network || 'testnet';
+                document.getElementById('ccMode').innerText = data.mode === 'live' ? 'LIVE (On-Chain)' : 'SIMULATE (Sin firma/nodo)';
+                document.getElementById('ccGrpc').innerText = grpc.connected
+                    ? `Conectado (${grpc.host}:${grpc.port})`
+                    : `Offline / Fallback (${grpc.host || 'no config'})`;
+                document.getElementById('ccBlock').innerText = grpc.block_height ?? 'N/A';
+
+                if (cisBadge.agent_account) {
+                    document.getElementById('ccAgentAccount').innerText = cisBadge.agent_account;
+                }
+                document.getElementById('ccCardHash').innerText = cisBadge.agent_card_hash
+                    ? shortHash(cisBadge.agent_card_hash, 18)
+                    : 'No disponible';
+
+                setContractBadge('ccContractEvidence', contracts.evidence_registry);
+                setContractBadge('ccContractReward', contracts.reward_pool);
+                setContractBadge('ccContractCis8004', contracts.cis8004);
+                setContractBadge('ccContractCis8', contracts.cis8);
+            } catch (err) {
+                badge.className = 'badge-unverified';
+                badge.innerHTML = '<i class="bi bi-wifi-off"></i> Estado Concordium no disponible';
+                document.getElementById('ccNetwork').innerText = 'error';
+                document.getElementById('ccMode').innerText = 'error';
+                document.getElementById('ccGrpc').innerText = err.message;
+            }
+        }
+
+        function setContractBadge(elId, info) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            if (!info || !info.configured) {
+                el.className = 'ms-1 badge bg-secondary';
+                el.innerText = 'No config';
+            } else if (info.on_chain) {
+                el.className = 'ms-1 badge bg-success';
+                el.innerText = 'On-Chain';
+            } else {
+                el.className = 'ms-1 badge bg-warning text-dark';
+                el.innerText = 'Simulado';
+            }
+        }
+
+        async function loadScenario() {
+            updateActiveButtons();
+            const flags = getDemoFlags();
+            const params = new URLSearchParams({
+                expired: String(flags.expired),
+                tampered: String(flags.tampered),
+                incomplete: String(flags.incomplete),
+                replay: String(flags.replay)
+            });
+
+            const baseUrl = SCENARIO_ENDPOINTS[currentScenario];
+            const statusBadge = document.getElementById('evaluationStatus');
+            statusBadge.innerText = 'EVALUANDO...';
+
+            try {
+                const response = await fetch(`${baseUrl}?${params.toString()}`);
+                const data = await response.json();
+                renderScenarioData(data);
+            } catch (err) {
+                document.getElementById('agentExplanation').innerText = `Error consultando el backend: ${err.message}`;
+            }
+        }
+
+        function renderScenarioData(data) {
+            const evaluation = data.evaluation || {};
+            const report = data.report || {};
+            const metadata = data.metadata || {};
+            if (!currentEvidenceId && (data.evidence_id || data.expected_evidence_root || evaluation.evidence_root)) {
+                currentEvidenceId = data.evidence_id || data.expected_evidence_root || evaluation.evidence_root;
+            }
+
+            // 1. Badges de estado y origen
+            const statusBadge = document.getElementById('evaluationStatus');
+            const st = evaluation.status || 'BLOCKED';
+            statusBadge.innerText = st;
+            if (st === 'ELIGIBLE') {
+                statusBadge.className = 'status-badge status-eligible';
+            } else if (st === 'INCOMPLETE') {
+                statusBadge.className = 'status-badge status-incomplete';
+            } else if (st === 'TAMPERED') {
+                statusBadge.className = 'status-badge status-tampered';
+            } else {
+                statusBadge.className = 'status-badge status-blocked';
+            }
+
+            const sourceMap = {
+                physical: 'Físico (MQ-135)',
+                synthetic_declared: 'Sintético Declarado',
+                imported: 'Importado (CSV + GPS)'
+            };
+            document.getElementById('sourceClassBadge').innerText = sourceMap[data.source_classification] || data.source_classification || '-';
+            document.getElementById('variantLabel').innerText = data.variant || '-';
+            document.getElementById('policyHashValue').innerText = evaluation.policy_hash || '-';
+            document.getElementById('evidenceRootValue').innerText = evaluation.evidence_root || data.expected_evidence_root || '-';
+
+            // 2. KPIs reales
+            renderKpis(data);
+
+            // 3. Explicación, alcance honesto, mitigaciones y checks
+            document.getElementById('honestScopeNotice').innerHTML =
+                `<i class="bi bi-info-circle-fill me-1"></i> <strong>Alcance Honesto:</strong> ${escapeHtml(report.honest_scope_notice_es || 'Sin aviso.')}`;
+
+            document.getElementById('agentExplanation').innerText =
+                report.executive_summary || report.executive_summary_es || evaluation.reason || '';
+
+            const mitigations = report.mitigation_actions || [];
+            let mitHtml = '<strong>Acciones de mitigación recomendadas:</strong><ul class="mb-0 mt-1">';
+            mitigations.forEach(m => {
+                mitHtml += `<li>${escapeHtml(m)}</li>`;
+            });
+            mitHtml += '</ul>';
+            document.getElementById('agentMitigations').innerHTML = mitHtml;
+
+            renderChecks(evaluation.checks || []);
+
+            // 4. Gráfico Plotly (datos reales) + Mapa GPS si aplica
+            renderPlot(data);
+
+            // 5. Grafo de Attestations (7 niveles interactivo)
+            renderLineage(data.lineage || []);
+        }
+
+        function renderKpis(data) {
+            const row = document.getElementById('kpiRow');
+            const metrics = (data.evaluation && data.evaluation.metrics) || {};
+            const meta = data.metadata || {};
+            const readings = data.readings || [];
+            const zones = data.zones || [];
+
+            let cards = [];
+            if (data.scenario === 'business') {
+                const totalKwh = metrics.total_kwh ?? meta.total_kwh ?? zones.reduce((a, z) => a + (Number(z.kwh) || 0), 0);
+                const scope2 = metrics.scope2_total_kg_co2e ?? meta.scope2_total_kg_co2e ?? zones.reduce((a, z) => a + (Number(z.scope2_emissions_kg) || 0), 0);
+                const intensity = metrics.intensity_kg_per_unit ?? meta.intensity_kg_per_unit ?? 0;
+                const reduction = metrics.improvement_pct ?? meta.reduction_pct ?? 0;
+                cards = [
+                    { label: 'Zonas Reportadas', value: `${zones.length}` },
+                    { label: 'Consumo Total', value: `${Number(totalKwh).toFixed(1)} kWh` },
+                    { label: 'Scope 2 Total', value: `${Number(scope2).toFixed(2)} kg CO₂e` },
+                    { label: 'Intensidad / Reducción', value: `${Number(intensity).toFixed(3)} kg/u (${Number(reduction).toFixed(1)}%)` }
+                ];
+            } else {
+                const values = readings.map(r => Number(r.raw_signal)).filter(v => !Number.isNaN(v));
+                const baseline = metrics.baseline_value ?? (values.length ? values[0] : 0);
+                const peak = metrics.peak_value ?? (values.length ? Math.max(...values) : 0);
+                const recovery = metrics.recovery_value ?? (values.length ? values[values.length - 1] : 0);
+                cards = [
+                    { label: 'Lecturas en Lote', value: `${readings.length}` },
+                    { label: 'Línea Base (ADC)', value: `${Number(baseline).toFixed(1)}` },
+                    { label: 'Pico Máximo (ADC)', value: `${Number(peak).toFixed(1)}` },
+                    { label: data.scenario === 'imported_gps' ? 'Cierre / Centro GPS' : 'Recuperación (ADC)', value: data.scenario === 'imported_gps' && meta.lat_center !== undefined ? `${Number(recovery).toFixed(1)} (${meta.lat_center}, ${meta.lon_center})` : `${Number(recovery).toFixed(1)}` }
+                ];
+            }
+
+            row.innerHTML = cards.map(c => `
+                <div class="col-6 col-md-3">
+                    <div class="kpi-box">
+                        <div class="kpi-label">${escapeHtml(c.label)}</div>
+                        <div class="kpi-value">${escapeHtml(c.value)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderChecks(checks) {
+            const container = document.getElementById('policyChecksList');
+            if (!checks.length) {
+                container.innerHTML = '<div class="text-muted small">Sin checks registrados.</div>';
+                return;
+            }
+            container.innerHTML = checks.map(c => {
+                const passed = Boolean(c.passed);
+                const icon = passed
+                    ? '<i class="bi bi-check-circle-fill text-success me-1"></i>'
+                    : '<i class="bi bi-x-circle-fill text-danger me-1"></i>';
+                const badgeClass = passed ? 'bg-success bg-opacity-25 text-success' : 'bg-danger bg-opacity-25 text-danger';
+                return `
+                    <div class="check-item">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-semibold text-light">${icon}<code>${escapeHtml(c.name)}</code></span>
+                            <span class="badge ${badgeClass}">${passed ? 'APROBADO' : 'FALLIDO'}</span>
+                        </div>
+                        <div class="text-muted">${escapeHtml(c.detail || c.details || '')}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPlot(data) {
+            const mapContainer = document.getElementById('gpsMapContainer');
+            const readings = Array.isArray(data.readings) ? data.readings : [];
+            const zones = Array.isArray(data.zones) ? data.zones : [];
+
+            const baseLayout = {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                margin: { t: 24, r: 24, b: 54, l: 56 },
+                font: { color: '#94a3b8' },
+                xaxis: { gridcolor: '#1d2e3d', tickfont: { size: 11 } },
+                yaxis: { gridcolor: '#1d2e3d', tickfont: { size: 11 } },
+                legend: { orientation: 'h', y: 1.12, x: 0 }
+            };
+
+            if (data.scenario === 'home_air') {
+                mapContainer.classList.add('d-none');
+                Plotly.purge('plotlyMapDiv');
+
+                document.getElementById('plotTitle').innerText = 'Vera Home Air: Serie Real MQ-135 (Señal Cruda ADC)';
+                const phaseColors = {
+                    baseline: '#0099ff',
+                    anomaly_peak: '#ff4d6d',
+                    intervention: '#f59e0b',
+                    recovery: '#00d293'
+                };
+                const x = readings.map(r => `#${r.seq} · ${formatShortTime(r.timestamp).slice(11, 16) || r.seq}`);
+                const y = readings.map(r => Number(r.raw_signal));
+                const colors = readings.map(r => phaseColors[r.phase] || '#00d293');
+                const hoverText = readings.map(r =>
+                    `Lectura #${r.seq}<br>Fase: ${r.phase || 'N/A'}<br>Señal cruda: ${r.raw_signal} ${r.unit || 'adc_raw'}<br>Fecha: ${r.timestamp}`
+                );
+
+                const trace = {
+                    x,
+                    y,
+                    text: hoverText,
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#00d293', width: 2.5 },
+                    marker: { size: 7, color: colors, line: { width: 1, color: '#0a1118' } },
+                    name: 'Señal MQ-135 (ADC crudo)'
+                };
+
+                Plotly.newPlot('plotlyDiv', [trace], {
+                    ...baseLayout,
+                    xaxis: { ...baseLayout.xaxis, title: 'Secuencia / Hora UTC' },
+                    yaxis: { ...baseLayout.yaxis, title: 'Señal Cruda ADC (no CO₂ certificado)' }
+                }, { responsive: true });
+
+            } else if (data.scenario === 'business') {
+                mapContainer.classList.add('d-none');
+                Plotly.purge('plotlyMapDiv');
+
+                document.getElementById('plotTitle').innerText = 'Vera Business: Scope 2 Línea Base vs Actual por Zona (Sintético)';
+                const zoneNames = zones.map(z => z.zone_name);
+                const baselineScope2 = zones.map(z => Number(z.baseline_scope2_kg));
+                const currentScope2 = zones.map(z => Number(z.scope2_emissions_kg));
+                const hoverBaseline = zones.map(z =>
+                    `Zona: ${z.zone_name}<br>Línea base: ${z.baseline_kwh} kWh (${z.baseline_scope2_kg} kg CO₂e)`
+                );
+                const hoverCurrent = zones.map(z =>
+                    `Zona: ${z.zone_name}<br>Actual: ${z.kwh} kWh (${z.scope2_emissions_kg} kg CO₂e)<br>Unidades: ${z.units_produced}<br>Intensidad: ${Number(z.intensity_kg_per_unit).toFixed(4)} kg/unidad<br>Reducción: ${Number(z.reduction_pct).toFixed(2)}%`
+                );
+
+                const traceBaseline = {
+                    x: zoneNames,
+                    y: baselineScope2,
+                    text: hoverBaseline,
+                    hoverinfo: 'text',
+                    type: 'bar',
+                    name: 'Línea Base Scope 2 (kg CO₂e)',
+                    marker: { color: 'rgba(0, 153, 255, 0.55)', line: { color: '#0099ff', width: 1 } }
+                };
+
+                const traceCurrent = {
+                    x: zoneNames,
+                    y: currentScope2,
+                    text: hoverCurrent,
+                    hoverinfo: 'text',
+                    type: 'bar',
+                    name: 'Emisión Actual Scope 2 (kg CO₂e)',
+                    marker: {
+                        color: zones.map(z => Number(z.reduction_pct) >= 0 ? '#00d293' : '#ff4d6d')
+                    }
+                };
+
+                Plotly.newPlot('plotlyDiv', [traceBaseline, traceCurrent], {
+                    ...baseLayout,
+                    barmode: 'group',
+                    xaxis: { ...baseLayout.xaxis, title: 'Zonas Empresariales (Datos Sintéticos Declarados)' },
+                    yaxis: { ...baseLayout.yaxis, title: 'Emisiones Scope 2 (kg CO₂e)' }
+                }, { responsive: true });
+
+            } else if (data.scenario === 'imported_gps') {
+                document.getElementById('plotTitle').innerText = 'Datos Importados (CSV + GPS Bogotá): Serie Temporal MQ-135';
+                const x = readings.map(r => `#${r.seq} · ${formatShortTime(r.timestamp).slice(11, 16) || r.seq}`);
+                const y = readings.map(r => Number(r.raw_signal));
+                const hoverText = readings.map(r =>
+                    `Punto #${r.seq} (${r.origin || 'sensor'})<br>Señal cruda: ${r.raw_signal} ${r.unit || 'adc_raw'}<br>Lat: ${r.lat}, Lon: ${r.lon}<br>Fecha: ${r.timestamp}`
+                );
+
+                const traceSeries = {
+                    x,
+                    y,
+                    text: hoverText,
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#0099ff', width: 2.5 },
+                    marker: {
+                        size: 7,
+                        color: y,
+                        colorscale: [[0, '#00d293'], [0.5, '#0099ff'], [1, '#ff4d6d']],
+                        showscale: false
+                    },
+                    name: 'Señal Importada (ADC)'
+                };
+
+                Plotly.newPlot('plotlyDiv', [traceSeries], {
+                    ...baseLayout,
+                    xaxis: { ...baseLayout.xaxis, title: 'Secuencia de Recorrido CSV' },
+                    yaxis: { ...baseLayout.yaxis, title: 'Señal MQ-135 (raw_signal)' }
+                }, { responsive: true });
+
+                // Renderizar Mapa GPS Interactivo con Plotly (scattermapbox / open-street-map)
+                mapContainer.classList.remove('d-none');
+                renderGpsMap(readings, data.metadata || {});
+            } else if (data.scenario === 'live_telemetry') {
+                document.getElementById('plotTitle').innerText = 'Sensor Físico en Vivo (ESP8266 / SQLite): Serie Temporal MQ-135';
+                const x = readings.map(r => `#${r.sequence ?? r.seq} · ${formatShortTime(r.timestamp).slice(11, 16) || (r.seq ?? '')}`);
+                const y = readings.map(r => Number(r.raw_signal));
+                const hoverText = readings.map(r =>
+                    `Dispositivo: ${r.device_id || 'esp8266'}<br>Secuencia: #${r.sequence ?? r.seq}<br>Señal cruda: ${r.raw_signal} ${r.unit || 'adc_raw'}<br>Lat: ${r.lat ?? 0}, Lon: ${r.lon ?? 0}<br>Fecha: ${r.timestamp}`
+                );
+
+                const traceLive = {
+                    x,
+                    y,
+                    text: hoverText,
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#00d293', width: 2.5 },
+                    marker: {
+                        size: 7,
+                        color: y,
+                        colorscale: [[0, '#00d293'], [0.5, '#f59e0b'], [1, '#ff4d6d']],
+                        showscale: false
+                    },
+                    name: 'Telemetría Física en Vivo (ADC)'
+                };
+
+                Plotly.newPlot('plotlyDiv', [traceLive], {
+                    ...baseLayout,
+                    xaxis: { ...baseLayout.xaxis, title: 'Secuencia / Hora UTC (ESP8266)' },
+                    yaxis: { ...baseLayout.yaxis, title: 'Señal Cruda MQ-135 (ADC)' }
+                }, { responsive: true });
+
+                const gpsReadings = readings.filter(
+                    r => typeof r.lat === 'number' && typeof r.lon === 'number' && (r.lat !== 0 || r.lon !== 0)
+                );
+                if (gpsReadings.length > 0) {
+                    mapContainer.classList.remove('d-none');
+                    renderGpsMap(gpsReadings, data.metadata || {});
+                } else {
+                    mapContainer.classList.add('d-none');
+                    Plotly.purge('plotlyMapDiv');
+                }
+            }
+        }
+
+        function renderGpsMap(readings, metadata) {
+            const validPoints = readings.filter(r => typeof r.lat === 'number' && typeof r.lon === 'number');
+            document.getElementById('gpsPointCount').innerText = `${validPoints.length} puntos georreferenciados`;
+
+            if (!validPoints.length) {
+                Plotly.purge('plotlyMapDiv');
+                return;
+            }
+
+            const lats = validPoints.map(r => r.lat);
+            const lons = validPoints.map(r => r.lon);
+            const signals = validPoints.map(r => Number(r.raw_signal));
+            const centerLat = metadata.lat_center ?? (lats.reduce((a, b) => a + b, 0) / lats.length);
+            const centerLon = metadata.lon_center ?? (lons.reduce((a, b) => a + b, 0) / lons.length);
+
+            const hoverText = validPoints.map(r =>
+                `Punto #${r.sequence ?? r.seq} · ${r.device_id || r.origin || 'sensor'}<br>Señal: ${r.raw_signal} (${r.unit || 'adc_raw'})<br>Lat: ${r.lat.toFixed(6)}, Lon: ${r.lon.toFixed(6)}<br>${r.timestamp}`
+            );
+
+            const routeLineTrace = {
+                type: 'scattermapbox',
+                mode: 'lines',
+                lat: lats,
+                lon: lons,
+                line: { width: 3, color: '#0099ff' },
+                hoverinfo: 'skip',
+                name: 'Ruta GPS'
+            };
+
+            const markersTrace = {
+                type: 'scattermapbox',
+                mode: 'markers',
+                lat: lats,
+                lon: lons,
+                text: hoverText,
+                hoverinfo: 'text',
+                name: 'Lecturas MQ-135',
+                marker: {
+                    size: 11,
+                    color: signals,
+                    colorscale: [
+                        [0.0, '#00d293'],
+                        [0.5, '#f59e0b'],
+                        [1.0, '#ff4d6d']
+                    ],
+                    colorbar: {
+                        title: { text: 'Señal ADC', font: { color: '#cbd5e1', size: 11 } },
+                        tickfont: { color: '#cbd5e1', size: 10 },
+                        thickness: 12
+                    },
+                    opacity: 0.92
+                }
+            };
+
+            const mapLayout = {
+                paper_bgcolor: 'transparent',
+                margin: { t: 0, r: 0, b: 0, l: 0 },
+                font: { color: '#cbd5e1' },
+                showlegend: false,
+                mapbox: {
+                    style: 'open-street-map',
+                    center: { lat: centerLat, lon: centerLon },
+                    zoom: 14.2
+                }
+            };
+
+            Plotly.newPlot('plotlyMapDiv', [routeLineTrace, markersTrace], mapLayout, { responsive: true });
+        }
+
+        function renderLineage(lineage) {
+            const container = document.getElementById('lineageContainer');
+            container.innerHTML = '';
+
+            const nodeById = {};
+            const levelsPresent = new Set();
+            lineage.forEach(node => {
+                nodeById[node.node_id] = node;
+                levelsPresent.add(node.level);
+            });
+
+            document.getElementById('lineageCountBadge').innerText = `${levelsPresent.size} / 7 Niveles`;
+
+            lineage.forEach(node => {
+                const nodeHash = node.content_hash || node.hash || '';
+                const parentIds = Array.isArray(node.parent_ids) ? node.parent_ids : [];
+                const parentHashes = parentIds.map(pid => {
+                    const parentNode = nodeById[pid];
+                    const pHash = parentNode ? (parentNode.content_hash || parentNode.hash) : null;
+                    return pHash ? `${pid}: ${pHash}` : `${pid} (sin hash local)`;
+                });
+                const parentHashDisplay = parentHashes.length
+                    ? parentHashes.join('\n')
+                    : 'N/A (Nodo raíz Nivel 1)';
+
+                const isExpanded = expandedNodes.has(node.node_id);
+                const levelLabel = node.level_label_es || LEVEL_LABELS_ES[node.level] || `Nivel ${node.level}`;
+                const summaryHint =
+                    node.payload?.device_id ||
+                    node.payload?.sensor_status ||
+                    node.payload?.status ||
+                    node.payload?.methodology ||
+                    node.node_id;
+
+                const nodeDiv = document.createElement('div');
+                nodeDiv.className = `step-node${isExpanded ? ' expanded' : ''}`;
+                nodeDiv.onclick = () => toggleNodeDetails(node.node_id);
+
+                nodeDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                        <span class="fw-bold small text-light d-flex align-items-center">
+                            <span class="step-number ${node.level >= 6 ? 'step-number-settlement' : ''}">${escapeHtml(node.level)}</span>
+                            <span>${escapeHtml(levelLabel)}</span>
+                        </span>
+                        <span class="d-flex align-items-center gap-2">
+                            <code class="small text-info">${escapeHtml(shortHash(nodeHash, 12))}</code>
+                            <i class="bi ${isExpanded ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted small"></i>
+                        </span>
+                    </div>
+                    <div class="text-muted small ps-4 d-flex justify-content-between">
+                        <span>${escapeHtml(summaryHint)}</span>
+                        <span class="text-secondary">${escapeHtml(formatShortTime(node.timestamp))}</span>
+                    </div>
+                    <div id="node-detail-${escapeHtml(node.node_id)}" class="node-details ${isExpanded ? '' : 'd-none'}" onclick="event.stopPropagation()">
+                        <div class="mb-1">
+                            <span class="text-muted">node_id:</span>
+                            <code class="text-light hash-mono">${escapeHtml(node.node_id)}</code>
+                        </div>
+                        <div class="mb-1">
+                            <span class="text-muted">hash (content_hash):</span>
+                            <div class="text-info hash-mono">${escapeHtml(nodeHash)}</div>
+                        </div>
+                        <div class="mb-1">
+                            <span class="text-muted">parent_hash:</span>
+                            <div class="text-warning hash-mono" style="white-space: pre-wrap;">${escapeHtml(parentHashDisplay)}</div>
+                        </div>
+                        <div class="mb-2">
+                            <span class="text-muted">timestamp:</span>
+                            <code class="text-light">${escapeHtml(node.timestamp)}</code>
+                        </div>
+                        <div>
+                            <span class="text-muted">payload JSON:</span>
+                            <pre class="node-json-pre">${escapeHtml(JSON.stringify(node.payload || {}, null, 2))}</pre>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(nodeDiv);
+            });
+
+            // Mostrar niveles faltantes hasta el Nivel 7 para claridad visual del jurado
+            for (let lvl = 1; lvl <= 7; lvl++) {
+                if (!levelsPresent.has(lvl)) {
+                    const pendingDiv = document.createElement('div');
+                    pendingDiv.className = 'step-node-pending small';
+                    pendingDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>
+                                <span class="step-number step-number-pending">${lvl}</span>
+                                ${escapeHtml(LEVEL_LABELS_ES[lvl])}
+                            </span>
+                            <span class="badge bg-dark text-muted border border-secondary border-opacity-25">
+                                ${lvl === 7 ? 'Pendiente de liquidación' : 'No generado / Bloqueado'}
+                            </span>
+                        </div>
+                    `;
+                    container.appendChild(pendingDiv);
+                }
+            }
+        }
+
+        function toggleNodeDetails(nodeId) {
+            if (expandedNodes.has(nodeId)) {
+                expandedNodes.delete(nodeId);
+            } else {
+                expandedNodes.add(nodeId);
+            }
+            const detailEl = document.getElementById(`node-detail-${nodeId}`);
+            if (detailEl) {
+                detailEl.classList.toggle('d-none');
+                const parentCard = detailEl.closest('.step-node');
+                if (parentCard) {
+                    parentCard.classList.toggle('expanded');
+                    const chevron = parentCard.querySelector('.bi-chevron-down, .bi-chevron-up');
+                    if (chevron) {
+                        chevron.classList.toggle('bi-chevron-down');
+                        chevron.classList.toggle('bi-chevron-up');
+                    }
+                }
+            }
+        }
+
+        async function executeSettlement() {
+            const btn = document.getElementById('btnSettle');
+            const box = document.getElementById('settlementResultBox');
+            const flags = getDemoFlags();
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Procesando...';
+
+            try {
+                const response = await fetch('/api/settle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenario: currentScenario,
+                        expired: flags.expired,
+                        tampered: flags.tampered,
+                        incomplete: flags.incomplete,
+                        replay: flags.replay,
+                        idempotency_key: currentEvidenceId
+                    })
+                });
+                const data = await response.json();
+
+                // Actualizar todo el dashboard con los nodos nivel 6/7 recién generados
+                renderScenarioData(data);
+
+                const evalData = data.evaluation || {};
+                if (data.settled) {
+                    const ccdAmount = ((Number(data.amount_micro_ccd) || 0) / 1_000_000).toFixed(6);
+                    const modeLabel = data.simulated
+                        ? 'SIMULADO (Modo Demo / Sin firma on-chain)'
+                        : 'CONFIRMADO ON-CHAIN (Concordium Testnet)';
+                    box.className = 'settle-box small border-success';
+                    box.innerHTML = `
+                        <div class="d-flex align-items-center gap-2 text-success fw-bold mb-2">
+                            <i class="bi bi-check-circle-fill fs-5"></i>
+                            <span>Liquidación ${escapeHtml(modeLabel)}</span>
+                        </div>
+                        <div class="mb-1"><span class="text-muted">tx_hash:</span> <code class="text-info hash-mono">${escapeHtml(data.tx_hash || 'N/A')}</code></div>
+                        <div class="mb-1"><span class="text-muted">evidence_id:</span> <code class="text-light hash-mono">${escapeHtml(data.evidence_id || '-')}</code></div>
+                        <div class="mb-1"><span class="text-muted">Receptor:</span> <code class="text-light hash-mono">${escapeHtml(data.recipient || '-')}</code></div>
+                        <div><span class="text-muted">Recompensa:</span> <strong class="text-success">${escapeHtml(data.amount_micro_ccd)} microCCD</strong> (${ccdAmount} CCD)</div>
+                    `;
+                } else {
+                    box.className = 'settle-box small border-danger';
+                    box.innerHTML = `
+                        <div class="d-flex align-items-center gap-2 text-danger fw-bold mb-2">
+                            <i class="bi bi-x-octagon-fill fs-5"></i>
+                            <span>Liquidación Rechazada (${escapeHtml(evalData.status || data.mode || 'REJECTED')})</span>
+                        </div>
+                        <div class="mb-2 text-light"><strong>Motivo determinista:</strong> ${escapeHtml(evalData.reason || 'La política determinista bloqueó el pago.')}</div>
+                        <div class="mb-1"><span class="text-muted">evidence_id:</span> <code class="text-light hash-mono">${escapeHtml(data.evidence_id || '-')}</code></div>
+                        <div><span class="text-muted">Monto liberado:</span> <strong class="text-danger">0 microCCD</strong></div>
+                    `;
+                }
+            } catch (err) {
+                box.className = 'settle-box small border-danger';
+                box.innerHTML = `<span class="text-danger">Error ejecutando liquidación: ${escapeHtml(err.message)}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send-check"></i> Ejecutar / Simular Liquidación en Concordium';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadConcordiumStatus();
+            loadScenario();
         });
-    });
-
-    disconnectButton.addEventListener('click', () => {
-      // Aquí puedes realizar cualquier tarea necesaria para desconectar.
-      // MetaMask no tiene un método explícito para "desconectar", pero puedes limpiar la UI.
-      connectButton.style.display = 'inline-block';
-      disconnectButton.style.display = 'none';
-      updateWalletAddress(null);
-      console.log('Disconnected from MetaMask');
-    });
-
-    window.addEventListener('load', checkConnection);
-  </script>
+    </script>
 </body>
-
 </html>

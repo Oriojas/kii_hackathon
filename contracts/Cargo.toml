@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "evidence_registry",
+    "reward_pool",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1
