@@ -81,7 +81,7 @@ Los reportes ambientales tradicionales y los sistemas de incentivos ecológicos 
   - Nodo ESP8266 con sensor analógico MQ-135 y módulo GPS (`TinyGPS++`).
   - Envía peticiones **`HTTP POST`** con cuerpo JSON a `SERVER_URL`, cabeceras `Content-Type: application/json` y `Authorization: Bearer <API_TOKEN>`, y payload explícito con `"device_id"`, `"source_type":"physical"`, `"sensor_model":"MQ-135-raw"`, `"raw_signal"`, `"lat"`, `"lon"` y `"sequence"`. Todas las credenciales y parámetros provienen de `env.h`.
 - **Backend FastAPI & Dashboard (`main.py` y `templates/home_page/index.html`)**:
-  - Expone la interfaz web interactiva, la Agent Card pública en `/.well-known/agent-card.json`, los endpoints de escenarios (`/api/scenarios/home-air`, `/api/scenarios/business`) y la ingesta de telemetría IoT (`POST /api/telemetry`) respaldada por SQLite local por defecto (`SQLITE_DB_PATH`).
+  - Expone la interfaz web interactiva (4 escenarios, mapa GPS y grafo de attestations clicable), la Agent Card pública en `/.well-known/agent-card.json`, los endpoints de escenarios (`/api/scenarios/home-air`, `/api/scenarios/business`, `/api/scenarios/imported-gps`, `/api/scenarios/live-telemetry`), verificación/liquidación Concordium (`/api/concordium/status`, `POST /api/settle`) y la ingesta de telemetría IoT (`POST /api/telemetry`) respaldada por SQLite local por defecto (`SQLITE_DB_PATH`).
 
 ---
 
@@ -182,10 +182,10 @@ cd ..
 
 ## 6. Ejecución de Tests (Python, TypeScript y Rust)
 
-### Tests de Python (`vera_core` y paridad Merkle/JSON con Node.js)
+### Tests de Python (`vera_core`, paridad Merkle/JSON con Node.js y API FastAPI)
 
 ```bash
-python3 -m unittest tests/test_vera_core.py -v
+python3 -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 ### Tests y Typecheck de TypeScript (`concordium-bridge`)
@@ -226,8 +226,12 @@ uvicorn main:app --host 0.0.0.0 --port 8086 --reload
 Endpoints disponibles tras el arranque:
 - **Dashboard Web**: `http://localhost:8086/`
 - **Agent Card CIS-8004**: `http://localhost:8086/.well-known/agent-card.json`
-- **Escenario Home Air**: `GET /api/scenarios/home-air` (soporta `?expired=true`, `?tampered=true`, `?incomplete=true`)
-- **Escenario Business**: `GET /api/scenarios/business` (soporta `?tampered=true`, `?incomplete=true`)
+- **Estado Concordium & Badge**: `GET /api/concordium/status`
+- **Escenario Home Air**: `GET /api/scenarios/home-air` (soporta `?expired=true`, `?tampered=true`, `?incomplete=true`, `?replay=true`)
+- **Escenario Business**: `GET /api/scenarios/business` (soporta `?expired=true`, `?tampered=true`, `?incomplete=true`, `?replay=true`)
+- **Escenario Datos Importados CSV+GPS**: `GET /api/scenarios/imported-gps` (soporta `?expired=true`, `?tampered=true`, `?incomplete=true`, `?replay=true`)
+- **Escenario Sensor Físico en Vivo (SQLite)**: `GET /api/scenarios/live-telemetry` (soporta `?expired=true`, `?tampered=true`, `?incomplete=true`, `?replay=true`)
+- **Liquidación Verificada**: `POST /api/settle` (evalúa `PolicyEngine`, ejecuta vía `concordium-bridge` y protege contra replay en SQLite)
 - **Ingesta de Telemetría IoT**: `POST /api/telemetry` con cabecera `Authorization: Bearer <API_AUTH_TOKEN>` y cuerpo JSON:
   ```json
   {
@@ -271,9 +275,15 @@ Endpoints disponibles tras el arranque:
    - Calcula el `policy_hash` determinista (desde `PolicyEngine` / `concordium-bridge`) e inicializa `reward_pool` pasando `InitParams` (`policy_hash` de 32 bytes y `evidence_registry` apuntando a `<EVIDENCE_REGISTRY_INDEX>,0`).
    - Fondea `reward_pool` mediante el entrypoint `fund` (o al inicializarlo con `--amount`).
 
-4. **Actualizar `.env` y verificar con el bridge**:
+4. **Onboarding automatizado y verificación con el bridge**:
+   - Puedes simular o ejecutar el onboarding completo (validación gRPC, artefactos `.wasm.v1`, despliegue/verificación de contratos, registro `CIS-8004` y enlace `CIS-8`) directamente con:
+     ```bash
+     cd concordium-bridge
+     npm run onboard:testnet -- --simulate   # Simulación segura sin gastar CCD
+     npm run onboard:testnet                # Ejecución real en Testnet (requiere .env con llave)
+     npm run test:vectors                   # Paridad de hashes con el backend Python
+     ```
    - Registra los índices desplegados en `.env` (`CONCORDIUM_EVIDENCE_REGISTRY_INDEX`, `CONCORDIUM_REWARD_POOL_INDEX`, `CONCORDIUM_CIS8004_INDEX`, `CONCORDIUM_CIS8_INDEX`) y configura `CONCORDIUM_AGENT_ACCOUNT_ADDRESS` y `CONCORDIUM_AGENT_PRIVATE_KEY_PATH`.
-   - Ejecuta `cd concordium-bridge && npm run test:vectors` para verificar la generación de la Agent Card CIS-8004, el enlace CIS-8 y la paridad de hashes con el backend Python.
 
 ---
 
