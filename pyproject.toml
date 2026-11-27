@@ -1,22 +1,17 @@
 [tool.poetry]
-name = "kii-hackathon"
-version = "0.1.0"
-description = ""
+name = "vera-concordium"
+version = "1.0.0"
+description = "VERA - Verified Environmental Responsibility Agent for Concordium Trusted Agents Hackathon"
 authors = ["oriojas <oscarriojas@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-kiipy = "^0.1.0"
-web3 = "^6.20.2"
-pymysql = "^1.1.1"
-uvicorn = "^0.30.6"
-pandas = "^2.2.2"
-python-dotenv = "^1.0.1"
 fastapi = "^0.112.2"
-plotly = "^5.23.0"
+uvicorn = "^0.30.6"
+python-dotenv = "^1.0.1"
 jinja2 = "^3.1.4"
-sshtunnel = "^0.4.0"
+httpx = "^0.28.1"
 
 
 [build-system]

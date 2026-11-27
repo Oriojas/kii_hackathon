@@ -11,6 +11,7 @@
     "test:vectors": "tsx src/test_vectors.ts",
     "dev": "tsx src/test_vectors.ts",
     "deploy:testnet": "tsx src/deploy.ts",
+    "onboard:testnet": "tsx src/onboard_testnet.ts",
     "cli": "tsx src/cli.ts"
   },
   "dependencies": {

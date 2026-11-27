@@ -32,6 +32,7 @@ from vera_core.scenarios import (
     get_business_scenario,
     get_home_air_scenario,
     get_imported_gps_scenario,
+    get_live_telemetry_scenario,
 )
 
 load_dotenv()
@@ -285,9 +286,21 @@ def _resolve_scenario_bundle(
             config=config,
         )
 
+    if normalized == "live_telemetry":
+        return get_live_telemetry_scenario(
+            _get_sqlite_path(),
+            expired_calibration=expired,
+            tampered=tampered,
+            incomplete=incomplete,
+            config=config,
+        )
+
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Escenario no soportado: {scenario!r}. Use 'home_air', 'business' o 'imported_gps'.",
+        detail=(
+            f"Escenario no soportado: {scenario!r}. "
+            "Use 'home_air', 'business', 'imported_gps' o 'live_telemetry'."
+        ),
     )
 
 
@@ -474,6 +487,36 @@ async def scenario_imported_gps(
         tampered=tampered,
         incomplete=incomplete,
         csv_path=csv_path,
+    )
+    engine = PolicyEngine(config=config)
+    result = engine.evaluate(
+        bundle.graph,
+        scenario_type=bundle.scenario_type,
+        evaluation_timestamp=bundle.evaluation_timestamp,
+        expected_evidence_root=bundle.expected_evidence_root,
+        already_settled=replay,
+        record_in_graph=True,
+    )
+    return _format_scenario_response(bundle, result)
+
+
+@app.get("/api/scenarios/live-telemetry")
+async def scenario_live_telemetry(
+    expired: bool = False,
+    tampered: bool = False,
+    incomplete: bool = False,
+    replay: bool = False,
+):
+    """
+    Retorna el escenario de telemetría física en vivo (ESP8266 / SQLite `telemetry`)
+    evaluado contra `PolicyEngine` y con su grafo de attestations.
+    """
+    bundle = get_live_telemetry_scenario(
+        _get_sqlite_path(),
+        expired_calibration=expired,
+        tampered=tampered,
+        incomplete=incomplete,
+        config=config,
     )
     engine = PolicyEngine(config=config)
     result = engine.evaluate(

@@ -143,7 +143,7 @@ class VeraAgent:
                 "con señal MQ-135 geolocalizada; no constituyen mediciones certificadas de CO2 ni "
                 "reemplazan auditorías ambientales acreditadas."
             )
-        if scenario_type == "home_air":
+        if scenario_type in {"home_air", "live_telemetry"}:
             return (
                 "Las lecturas provienen de un sensor MQ-135 reportadas como señal analógica cruda (ADC) "
                 "para detectar anomalías y recuperación relativa; no constituyen mediciones certificadas "
@@ -169,6 +169,8 @@ class VeraAgent:
 
         if evaluation.scenario_type == "home_air":
             escenario_es = "calidad de aire en hogar (MQ-135 señal cruda)"
+        elif evaluation.scenario_type == "live_telemetry":
+            escenario_es = "telemetría física en vivo (ESP8266 / MQ-135-raw en SQLite)"
         elif evaluation.scenario_type == "imported_gps":
             escenario_es = "trayectoria móvil importada (CSV + GPS + MQ-135)"
         else:
@@ -199,7 +201,7 @@ class VeraAgent:
             f"evidence_root={evaluation.evidence_root[:16]}...",
         ]
 
-        if evaluation.scenario_type in {"home_air", "imported_gps"} and evaluation.metrics:
+        if evaluation.scenario_type in {"home_air", "imported_gps", "live_telemetry"} and evaluation.metrics:
             peak = evaluation.metrics.get("peak_value")
             recovery = evaluation.metrics.get("recovery_value")
             baseline = evaluation.metrics.get("baseline_value")
@@ -268,7 +270,7 @@ class VeraAgent:
                     "idempotency_key único."
                 )
 
-        if evaluation.scenario_type in {"home_air", "imported_gps"}:
+        if evaluation.scenario_type in {"home_air", "imported_gps", "live_telemetry"}:
             if evaluation.status == STATUS_BLOCKED and evaluation.metrics.get("anomaly_detected"):
                 actions.extend([
                     "Activar ventilación cruzada o extracción mecánica inmediata hasta reducir la señal "

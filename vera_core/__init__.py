@@ -39,6 +39,7 @@ from vera_core.scenarios import (
     get_business_scenario,
     get_home_air_scenario,
     get_imported_gps_scenario,
+    get_live_telemetry_scenario,
 )
 
 __all__ = [
@@ -68,6 +69,7 @@ __all__ = [
     "get_business_scenario",
     "get_home_air_scenario",
     "get_imported_gps_scenario",
+    "get_live_telemetry_scenario",
     "sha256_hex",
     "verify_merkle_proof",
 ]

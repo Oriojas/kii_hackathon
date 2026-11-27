@@ -325,7 +325,7 @@
             </div>
         </div>
 
-        <!-- Selector de Escenario (3 Pestañas) y 4 Botones de Demostración para el Jurado -->
+        <!-- Selector de Escenario (4 Pestañas) y 4 Botones de Demostración para el Jurado -->
         <div class="dashboard-card py-3">
             <div class="row g-3 align-items-center">
                 <div class="col-xl-7">
@@ -341,6 +341,9 @@
                         </button>
                         <button id="tab-imported_gps" class="btn btn-tab-custom px-3 py-2" onclick="selectScenario('imported_gps')">
                             <i class="bi bi-geo-alt"></i> Datos Importados (CSV + GPS Bogotá)
+                        </button>
+                        <button id="tab-live_telemetry" class="btn btn-tab-custom px-3 py-2" onclick="selectScenario('live_telemetry')">
+                            <i class="bi bi-cpu"></i> Sensor Físico en Vivo (ESP8266 / SQLite)
                         </button>
                     </div>
                 </div>
@@ -388,16 +391,18 @@
                     <!-- Gráfico Principal Plotly (datos reales) -->
                     <div id="plotlyDiv" style="height: 360px;"></div>
 
-                    <!-- Mapa GPS Interactivo Plotly (solo Datos Importados CSV + GPS Bogotá) -->
-                    <div id="gpsMapSection" class="d-none mt-4">
-                        <hr class="border-secondary opacity-25 my-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold mb-0">
-                                <i class="bi bi-map text-success"></i> Mapa Interactivo de Trayectoria GPS (Bogotá)
-                            </h6>
-                            <span class="small text-muted" id="gpsPointCount">-</span>
+                    <!-- Mapa GPS Interactivo Plotly (Datos Importados CSV + GPS o Telemetría en Vivo con GPS) -->
+                    <div id="gpsMapContainer" class="d-none mt-4">
+                        <div id="gpsMapSection">
+                            <hr class="border-secondary opacity-25 my-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold mb-0">
+                                    <i class="bi bi-map text-success"></i> Mapa Interactivo de Trayectoria GPS
+                                </h6>
+                                <span class="small text-muted" id="gpsPointCount">-</span>
+                            </div>
+                            <div id="plotlyMapDiv" style="height: 380px;"></div>
                         </div>
-                        <div id="plotlyMapDiv" style="height: 380px;"></div>
                     </div>
 
                     <hr class="border-secondary opacity-25 my-4">
@@ -480,7 +485,8 @@
         const SCENARIO_ENDPOINTS = {
             home_air: '/api/scenarios/home-air',
             business: '/api/scenarios/business',
-            imported_gps: '/api/scenarios/imported-gps'
+            imported_gps: '/api/scenarios/imported-gps',
+            live_telemetry: '/api/scenarios/live-telemetry'
         };
 
         const LEVEL_LABELS_ES = {
@@ -524,7 +530,7 @@
         }
 
         function updateActiveButtons() {
-            ['home_air', 'business', 'imported_gps'].forEach(sc => {
+            ['home_air', 'business', 'imported_gps', 'live_telemetry'].forEach(sc => {
                 const btn = document.getElementById(`tab-${sc}`);
                 if (btn) btn.classList.toggle('active', sc === currentScenario);
             });
@@ -768,7 +774,7 @@
         }
 
         function renderPlot(data) {
-            const mapSection = document.getElementById('gpsMapSection');
+            const mapContainer = document.getElementById('gpsMapContainer');
             const readings = Array.isArray(data.readings) ? data.readings : [];
             const zones = Array.isArray(data.zones) ? data.zones : [];
 
@@ -783,7 +789,7 @@
             };
 
             if (data.scenario === 'home_air') {
-                mapSection.classList.add('d-none');
+                mapContainer.classList.add('d-none');
                 Plotly.purge('plotlyMapDiv');
 
                 document.getElementById('plotTitle').innerText = 'Vera Home Air: Serie Real MQ-135 (Señal Cruda ADC)';
@@ -819,7 +825,7 @@
                 }, { responsive: true });
 
             } else if (data.scenario === 'business') {
-                mapSection.classList.add('d-none');
+                mapContainer.classList.add('d-none');
                 Plotly.purge('plotlyMapDiv');
 
                 document.getElementById('plotTitle').innerText = 'Vera Business: Scope 2 Línea Base vs Actual por Zona (Sintético)';
@@ -894,8 +900,49 @@
                 }, { responsive: true });
 
                 // Renderizar Mapa GPS Interactivo con Plotly (scattermapbox / open-street-map)
-                mapSection.classList.remove('d-none');
+                mapContainer.classList.remove('d-none');
                 renderGpsMap(readings, data.metadata || {});
+            } else if (data.scenario === 'live_telemetry') {
+                document.getElementById('plotTitle').innerText = 'Sensor Físico en Vivo (ESP8266 / SQLite): Serie Temporal MQ-135';
+                const x = readings.map(r => `#${r.sequence ?? r.seq} · ${formatShortTime(r.timestamp).slice(11, 16) || (r.seq ?? '')}`);
+                const y = readings.map(r => Number(r.raw_signal));
+                const hoverText = readings.map(r =>
+                    `Dispositivo: ${r.device_id || 'esp8266'}<br>Secuencia: #${r.sequence ?? r.seq}<br>Señal cruda: ${r.raw_signal} ${r.unit || 'adc_raw'}<br>Lat: ${r.lat ?? 0}, Lon: ${r.lon ?? 0}<br>Fecha: ${r.timestamp}`
+                );
+
+                const traceLive = {
+                    x,
+                    y,
+                    text: hoverText,
+                    hoverinfo: 'text',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#00d293', width: 2.5 },
+                    marker: {
+                        size: 7,
+                        color: y,
+                        colorscale: [[0, '#00d293'], [0.5, '#f59e0b'], [1, '#ff4d6d']],
+                        showscale: false
+                    },
+                    name: 'Telemetría Física en Vivo (ADC)'
+                };
+
+                Plotly.newPlot('plotlyDiv', [traceLive], {
+                    ...baseLayout,
+                    xaxis: { ...baseLayout.xaxis, title: 'Secuencia / Hora UTC (ESP8266)' },
+                    yaxis: { ...baseLayout.yaxis, title: 'Señal Cruda MQ-135 (ADC)' }
+                }, { responsive: true });
+
+                const gpsReadings = readings.filter(
+                    r => typeof r.lat === 'number' && typeof r.lon === 'number' && (r.lat !== 0 || r.lon !== 0)
+                );
+                if (gpsReadings.length > 0) {
+                    mapContainer.classList.remove('d-none');
+                    renderGpsMap(gpsReadings, data.metadata || {});
+                } else {
+                    mapContainer.classList.add('d-none');
+                    Plotly.purge('plotlyMapDiv');
+                }
             }
         }
 
@@ -915,7 +962,7 @@
             const centerLon = metadata.lon_center ?? (lons.reduce((a, b) => a + b, 0) / lons.length);
 
             const hoverText = validPoints.map(r =>
-                `Punto #${r.seq} · ${r.origin || 'sensor'}<br>Señal: ${r.raw_signal} (${r.unit || 'adc_raw'})<br>Lat: ${r.lat.toFixed(6)}, Lon: ${r.lon.toFixed(6)}<br>${r.timestamp}`
+                `Punto #${r.sequence ?? r.seq} · ${r.device_id || r.origin || 'sensor'}<br>Señal: ${r.raw_signal} (${r.unit || 'adc_raw'})<br>Lat: ${r.lat.toFixed(6)}, Lon: ${r.lon.toFixed(6)}<br>${r.timestamp}`
             );
 
             const routeLineTrace = {

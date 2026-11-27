@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import math
 import os
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -757,4 +758,304 @@ def get_imported_gps_scenario(
             "lat_center": round(mean(lats), 6),
             "lon_center": round(mean(lons), 6),
         },
+    )
+
+
+def _format_telemetry_timestamp(raw_ts: Any, fallback_dt: datetime) -> tuple[str, Optional[int]]:
+    """Convierte un timestamp entero (epoch) o ISO de SQLite a ISO-8601 UTC."""
+    if raw_ts is None:
+        return fallback_dt.isoformat(), int(fallback_dt.timestamp())
+    if isinstance(raw_ts, (int, float)):
+        epoch_int = int(raw_ts)
+        dt = datetime.fromtimestamp(epoch_int, tz=timezone.utc).replace(microsecond=0)
+        return dt.isoformat(), epoch_int
+    raw_str = str(raw_ts).strip()
+    if raw_str.isdigit():
+        epoch_int = int(raw_str)
+        dt = datetime.fromtimestamp(epoch_int, tz=timezone.utc).replace(microsecond=0)
+        return dt.isoformat(), epoch_int
+    normalized = f"{raw_str[:-1]}+00:00" if raw_str.endswith("Z") else raw_str
+    try:
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt_utc = dt.astimezone(timezone.utc).replace(microsecond=0)
+        return dt_utc.isoformat(), int(dt_utc.timestamp())
+    except ValueError:
+        return fallback_dt.isoformat(), int(fallback_dt.timestamp())
+
+
+def get_live_telemetry_scenario(
+    db_path: str,
+    limit: int = 48,
+    expired_calibration: bool = False,
+    tampered: bool = False,
+    incomplete: bool = False,
+    *,
+    variant: Optional[str] = None,
+    reference_time: Optional[datetime] = None,
+    config: Optional[VeraConfig] = None,
+) -> ScenarioBundle:
+    """Construye el escenario de telemetría física en vivo desde SQLite (`telemetry`).
+
+    Consulta las últimas `limit` filas en orden cronológico ascendente. Si la tabla
+    no existe o tiene menos de 10 lecturas (o `incomplete=True`), construye igualmente
+    el grafo de niveles 1–5 con `source_type='physical'` para que `PolicyEngine`
+    evalúe `INCOMPLETE` con razón clara.
+    """
+    cfg = config or VeraConfig.from_env()
+    eval_dt = _resolve_reference_time(cfg, reference_time)
+    eval_ts = eval_dt.isoformat()
+
+    is_tampered = tampered or variant == "tampered"
+    is_incomplete_flag = incomplete or variant == "incomplete"
+    is_expired = expired_calibration or variant == "expired_calibration"
+
+    rows: List[sqlite3.Row] = []
+    safe_limit = max(1, int(limit))
+    if db_path == ":memory:" or Path(db_path).is_file():
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, device_id, source_type, raw_signal, lat, lon, sequence, timestamp, evidence_hash
+                FROM telemetry
+                ORDER BY timestamp DESC, id DESC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            )
+            rows = cursor.fetchall()
+            rows.reverse()
+        except sqlite3.OperationalError:
+            rows = []
+        finally:
+            conn.close()
+
+    full_readings: List[Dict[str, Any]] = []
+    for idx, row in enumerate(rows):
+        ts_iso, ts_epoch = _format_telemetry_timestamp(row["timestamp"], eval_dt)
+        lat_val = float(row["lat"]) if row["lat"] is not None else 0.0
+        lon_val = float(row["lon"]) if row["lon"] is not None else 0.0
+        seq_val = int(row["sequence"]) if row["sequence"] is not None else (idx + 1)
+        device_id_val = str(row["device_id"] or cfg.home_device_id).strip() or cfg.home_device_id
+
+        full_readings.append({
+            "seq": idx + 1,
+            "sequence": seq_val,
+            "device_id": device_id_val,
+            "source_type": "physical",
+            "timestamp": ts_iso,
+            "timestamp_epoch": ts_epoch,
+            "raw_signal": float(row["raw_signal"]),
+            "lat": lat_val,
+            "lon": lon_val,
+            "unit": "adc_raw",
+            "sensor_model": "MQ-135-raw",
+            "is_certified_co2": False,
+        })
+
+    min_live_readings = 10
+    has_insufficient_rows = len(full_readings) < min_live_readings
+
+    if has_insufficient_rows:
+        batch_readings = list(full_readings)
+        min_expected_to_fail = int(math.ceil(min_live_readings / cfg.min_coverage_ratio)) + 1
+        expected_count = max(cfg.expected_batch_readings, min_expected_to_fail)
+    elif is_incomplete_flag:
+        total_expected = len(full_readings)
+        keep_count = max(1, int(total_expected * max(0.25, cfg.min_coverage_ratio - 0.30)))
+        batch_readings = full_readings[:keep_count]
+        min_expected_to_fail = int(math.ceil(keep_count / cfg.min_coverage_ratio)) + 1
+        expected_count = max(total_expected, min_expected_to_fail)
+    else:
+        batch_readings = list(full_readings)
+        expected_count = len(full_readings)
+
+    if variant:
+        resolved_variant = variant
+    elif is_tampered:
+        resolved_variant = "tampered"
+    elif is_incomplete_flag or has_insufficient_rows:
+        resolved_variant = "incomplete"
+    elif is_expired:
+        resolved_variant = "expired_calibration"
+    else:
+        resolved_variant = "valid"
+
+    if is_expired:
+        calibrated_dt = eval_dt - timedelta(hours=cfg.max_calibration_age_hours + 120)
+        expires_dt = eval_dt - timedelta(hours=24)
+        sensor_status = "EXPIRED"
+        cal_notes = "Calibración vencida en telemetría física en vivo (ESP8266 / MQ-135-raw)."
+    else:
+        calibrated_dt = eval_dt - timedelta(hours=48)
+        expires_dt = eval_dt + timedelta(hours=max(24, cfg.max_calibration_age_hours - 48))
+        sensor_status = "VALID"
+        cal_notes = "Calibración vigente declarada para telemetría física en vivo (MQ-135-raw)."
+
+    raw_values = [float(r["raw_signal"]) for r in batch_readings]
+    device_ids = sorted({str(r["device_id"]) for r in batch_readings})
+    primary_device_id = str(batch_readings[0]["device_id"]) if batch_readings else cfg.home_device_id
+    gps_readings = [
+        r for r in batch_readings
+        if float(r.get("lat", 0.0)) != 0.0 or float(r.get("lon", 0.0)) != 0.0
+    ]
+    gps_lats = [float(r["lat"]) for r in gps_readings]
+    gps_lons = [float(r["lon"]) for r in gps_readings]
+    location_label = (
+        f"esp8266-gps ({min(gps_lats):.4f},{min(gps_lons):.4f})..({max(gps_lats):.4f},{max(gps_lons):.4f})"
+        if gps_readings
+        else cfg.home_location_label
+    )
+
+    graph_id = f"live-telemetry-{resolved_variant}"
+    graph = AttestationGraph(graph_id=graph_id)
+    source_cls = "physical"
+
+    # Nivel 1: Dispositivo físico en vivo (ESP8266 / MQ-135-raw)
+    src_node = graph.register_device_source(
+        node_id=f"{graph_id}-source",
+        source_classification=source_cls,
+        timestamp=batch_readings[0]["timestamp"] if batch_readings else eval_ts,
+        device_id=primary_device_id,
+        sensor_model="MQ-135-raw",
+        firmware_or_generator="esp8266-live-telemetry-v1",
+        location_label=location_label,
+        declared_limitations=[
+            "Telemetría física en vivo recibida vía POST /api/telemetry y persistida en SQLite.",
+            "El sensor MQ-135-raw reporta señal analógica cruda ADC; is_certified_co2=False.",
+        ],
+        extra_metadata={
+            "source_type": "physical",
+            "sensor_model": "MQ-135-raw",
+            "is_certified_co2": False,
+            "device_ids": device_ids,
+            "gps_points": len(gps_readings),
+        },
+    )
+
+    # Nivel 2: Calibración
+    cal_node = graph.register_calibration(
+        node_id=f"{graph_id}-calibration",
+        parent_ids=[src_node.node_id],
+        source_classification=source_cls,
+        timestamp=calibrated_dt.isoformat(),
+        calibrated_at=calibrated_dt.isoformat(),
+        calibration_expires_at=expires_dt.isoformat(),
+        sensor_status=sensor_status,
+        reference_baseline=cfg.home_air_baseline_raw,
+        notes=cal_notes,
+    )
+
+    # Nivel 3: Lote de telemetría en vivo
+    batch_node = graph.register_batch(
+        node_id=f"{graph_id}-batch",
+        parent_ids=[src_node.node_id, cal_node.node_id],
+        source_classification=source_cls,
+        timestamp=batch_readings[-1]["timestamp"] if batch_readings else eval_ts,
+        readings=batch_readings,
+        expected_count=expected_count,
+        unit="adc_raw",
+    )
+
+    # Nivel 4: Dataset agregado
+    coverage_ratio = (len(batch_readings) / expected_count) if expected_count > 0 else 0.0
+    mean_val = mean(raw_values) if raw_values else 0.0
+    min_val = min(raw_values) if raw_values else 0.0
+    max_val = max(raw_values) if raw_values else 0.0
+
+    dataset_node = graph.register_dataset(
+        node_id=f"{graph_id}-dataset",
+        parent_ids=[batch_node.node_id],
+        source_classification=source_cls,
+        timestamp=eval_ts,
+        aggregation_window=f"live_last_{safe_limit}_readings",
+        reading_count=len(batch_readings),
+        expected_count=expected_count,
+        coverage_ratio=coverage_ratio,
+        mean_value=mean_val,
+        min_value=min_val,
+        max_value=max_val,
+    )
+
+    # Nivel 5: Análisis / Cálculo sobre serie en vivo
+    if raw_values:
+        baseline_avg = mean(raw_values[: max(1, len(raw_values) // 4)])
+        peak_val = max(raw_values)
+        recovery_avg = mean(raw_values[-max(1, len(raw_values) // 4) :])
+    else:
+        baseline_avg = 0.0
+        peak_val = 0.0
+        recovery_avg = 0.0
+
+    anomaly_detected = peak_val >= cfg.home_air_anomaly_min_raw
+    anomaly_mitigated = anomaly_detected and recovery_avg <= cfg.home_air_recovery_max_raw
+    improvement_pct = ((peak_val - recovery_avg) / peak_val * 100.0) if peak_val > 0 else 0.0
+
+    extra_analysis_metrics: Dict[str, Any] = {
+        "source_type": "physical",
+        "sensor_model": "MQ-135-raw",
+        "is_certified_co2": False,
+        "unit": "adc_raw",
+        "gps_points": len(gps_readings),
+    }
+    if gps_readings:
+        extra_analysis_metrics["lat_center"] = round(mean(gps_lats), 6)
+        extra_analysis_metrics["lon_center"] = round(mean(gps_lons), 6)
+
+    graph.register_analysis(
+        node_id=f"{graph_id}-analysis",
+        parent_ids=[dataset_node.node_id],
+        source_classification=source_cls,
+        timestamp=eval_ts,
+        methodology="live_mq135_raw_telemetry_v1",
+        baseline_value=baseline_avg,
+        peak_value=peak_val,
+        recovery_value=recovery_avg,
+        anomaly_detected=anomaly_detected,
+        anomaly_mitigated=anomaly_mitigated,
+        improvement_pct=improvement_pct,
+        extra_metrics=extra_analysis_metrics,
+    )
+
+    expected_root = graph.build_evidence_tree(max_level=AttestationLevel.ANALYSIS).evidence_root
+
+    if is_tampered:
+        if batch_node.payload["readings"]:
+            batch_node.payload["readings"][0]["raw_signal"] = 1.0
+        else:
+            dataset_node.payload["reading_count"] = -1
+
+    bundle_metadata: Dict[str, Any] = {
+        "source_type": "physical",
+        "db_path": str(db_path),
+        "device_id": primary_device_id,
+        "device_ids": device_ids,
+        "sensor_model": "MQ-135-raw",
+        "is_certified_co2": False,
+        "total_db_readings": len(full_readings),
+        "min_required_readings": min_live_readings,
+        "expired_calibration": is_expired,
+        "calibrated_at": calibrated_dt.isoformat(),
+        "calibration_expires_at": expires_dt.isoformat(),
+        "has_gps": bool(gps_readings),
+        "gps_points": len(gps_readings),
+    }
+    if gps_readings:
+        bundle_metadata["lat_center"] = round(mean(gps_lats), 6)
+        bundle_metadata["lon_center"] = round(mean(gps_lons), 6)
+
+    return ScenarioBundle(
+        scenario_type="live_telemetry",
+        variant=resolved_variant,
+        source_classification=source_cls,
+        evaluation_timestamp=eval_ts,
+        expected_evidence_root=expected_root,
+        graph=graph,
+        readings=batch_node.payload["readings"],
+        zones=[],
+        metadata=bundle_metadata,
     )

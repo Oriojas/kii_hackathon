@@ -152,6 +152,15 @@ class PolicyEngine:
                 "anomaly_min_raw": self.config.home_air_anomaly_min_raw,
                 "recovery_max_raw": self.config.home_air_recovery_max_raw,
             })
+        elif scenario_type == "live_telemetry":
+            base_params.update({
+                "source_classification": "physical",
+                "min_live_readings": 10,
+                "require_recovery_for_anomaly": self.config.require_recovery_for_anomaly,
+                "baseline_max_raw": self.config.home_air_baseline_max_raw,
+                "anomaly_min_raw": self.config.home_air_anomaly_min_raw,
+                "recovery_max_raw": self.config.home_air_recovery_max_raw,
+            })
         else:
             raise ValueError(f"Escenario no soportado por PolicyEngine: {scenario_type!r}")
         return base_params
@@ -410,7 +419,7 @@ class PolicyEngine:
             "improvement_pct": ap.get("improvement_pct"),
         }
 
-        if scenario_type in {"home_air", "imported_gps"}:
+        if scenario_type in {"home_air", "imported_gps", "live_telemetry"}:
             peak = float(ap.get("peak_value", 0.0))
             recovery = float(ap.get("recovery_value", 0.0))
             improvement = float(ap.get("improvement_pct", 0.0))
@@ -652,9 +661,9 @@ class PolicyEngine:
 
         settlement_node_id = f"{graph.graph_id}-settlement"
         reward_amount = (
-            self.config.home_reward_amount_micro_ccd
-            if evaluation.scenario_type == "home_air"
-            else self.config.business_reward_amount_micro_ccd
+            self.config.business_reward_amount_micro_ccd
+            if evaluation.scenario_type == "business"
+            else self.config.home_reward_amount_micro_ccd
         )
         resolved_key = idempotency_key or f"{graph.graph_id}:{evaluation.evidence_root[:16]}"
         if settlement_node_id not in graph.nodes:

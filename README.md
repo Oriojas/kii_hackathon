@@ -95,8 +95,9 @@ Los reportes ambientales tradicionales y los sistemas de incentivos ecológicos 
 2. **Vera Business (`business`)**:
    - Evalúa una operación empresarial multi-zona con **4 zonas declaradas** por defecto (`Oficinas`, `Producción`, `Bodega`, `Logística`) bajo `source_classification="synthetic_declared"` (`is_synthetic=true`).
    - Calcula consumo eléctrico (`kWh`), emisiones estimadas **Scope 2** (`kg CO2e`), intensidad por unidad producida y porcentaje de reducción frente a línea base.
-3. **Datos Importados CSV+GPS**:
-   - Conjunto georreferenciado de lecturas MQ-135 con coordenadas (`lat`, `lon`), identificador de origen y señal analógica disponible en [tests/fixtures/sample_gps_mq135.csv](tests/fixtures/sample_gps_mq135.csv) y utilidades de envío en [Test_send_data_endpoint.py](Test_send_data_endpoint.py). Permite validar flujos de ingesta con trazabilidad espacial.
+3. **Datos Importados CSV+GPS y Telemetría en Vivo**:
+   - Conjunto georreferenciado de lecturas MQ-135 con coordenadas (`lat`, `lon`), identificador de origen y señal analógica disponible en [tests/fixtures/sample_gps_mq135.csv](tests/fixtures/sample_gps_mq135.csv) (expuesto en `/api/scenarios/imported-gps`).
+   - Ingesta en tiempo real desde hardware ESP8266 vía `POST /api/telemetry` hacia SQLite y evaluación en `/api/scenarios/live-telemetry`.
 
 ### Los 4 Estados Reproducibles del `PolicyEngine`
 
@@ -152,7 +153,7 @@ poetry install
 # Opción B: Entorno virtual estándar
 python3 -m venv .venv
 source .venv/bin/activate
-pip install fastapi uvicorn python-dotenv jinja2 pandas plotly pymysql sshtunnel
+pip install fastapi uvicorn python-dotenv jinja2 httpx
 ```
 
 ### Paso 3: Instalar y Compilar `concordium-bridge` (TypeScript)

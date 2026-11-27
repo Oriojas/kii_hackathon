@@ -241,6 +241,123 @@ class TestFastApiEndpoints(unittest.TestCase):
         self.assertFalse(replay_data["settled"])
         self.assertEqual(replay_data["evaluation"]["status"], STATUS_BLOCKED)
 
+    def test_live_telemetry_empty_and_insufficient_returns_incomplete(self) -> None:
+        # 1. SQLite vacía -> INCOMPLETE sin error 500
+        r_empty = self.client.get("/api/scenarios/live-telemetry")
+        self.assertEqual(r_empty.status_code, 200)
+        empty_data = r_empty.json()
+        self.assertEqual(empty_data["scenario"], "live_telemetry")
+        self.assertEqual(empty_data["source_classification"], "physical")
+        self.assertEqual(empty_data["evaluation"]["status"], STATUS_INCOMPLETE)
+        self.assertFalse(empty_data["evaluation"]["payout_eligible"])
+        self.assertEqual(empty_data["readings"], [])
+        self.assertEqual(len(empty_data["lineage"]), 7)
+
+        # 2. Menos de 10 lecturas vía POST /api/telemetry -> INCOMPLETE
+        token = os.environ.get("API_AUTH_TOKEN", "your_secure_random_api_token_here")
+        headers = {"Authorization": f"Bearer {token}"}
+        for i in range(5):
+            r_post = self.client.post(
+                "/api/telemetry",
+                headers=headers,
+                json={
+                    "device_id": "esp8266-test-01",
+                    "raw_signal": 315.0 + i,
+                    "lat": 4.6144,
+                    "lon": -74.1106,
+                    "sequence": i + 1,
+                    "timestamp": 1764072000 + i * 60,
+                },
+            )
+            self.assertEqual(r_post.status_code, 200)
+
+        r_partial = self.client.get("/api/scenarios/live-telemetry")
+        self.assertEqual(r_partial.status_code, 200)
+        partial_data = r_partial.json()
+        self.assertEqual(partial_data["evaluation"]["status"], STATUS_INCOMPLETE)
+        self.assertEqual(len(partial_data["readings"]), 5)
+        self.assertTrue(all(r["source_type"] == "physical" for r in partial_data["readings"]))
+
+    def test_live_telemetry_eligible_blocked_and_settle_after_post_telemetry(self) -> None:
+        token = os.environ.get("API_AUTH_TOKEN", "your_secure_random_api_token_here")
+        headers = {"Authorization": f"Bearer {token}"}
+        # Curva válida: baseline -> pico -> recuperación dentro de umbral (12 lecturas >= 10)
+        signals = [315.0, 320.0, 325.0, 480.0, 620.0, 590.0, 470.0, 410.0, 355.0, 335.0, 325.0, 320.0]
+        for idx, sig in enumerate(signals):
+            r_post = self.client.post(
+                "/api/telemetry",
+                headers=headers,
+                json={
+                    "device_id": "esp8266-live-01",
+                    "source_type": "physical",
+                    "raw_signal": sig,
+                    "lat": 4.6144 + idx * 0.0001,
+                    "lon": -74.1106 - idx * 0.0001,
+                    "sequence": idx + 1,
+                    "timestamp": 1764070000 + idx * 60,
+                },
+            )
+            self.assertEqual(r_post.status_code, 200)
+
+        r_live = self.client.get("/api/scenarios/live-telemetry")
+        self.assertEqual(r_live.status_code, 200)
+        live_data = r_live.json()
+        self.assertEqual(live_data["scenario"], "live_telemetry")
+        self.assertEqual(live_data["source_classification"], "physical")
+        self.assertEqual(live_data["evaluation"]["status"], STATUS_ELIGIBLE)
+        self.assertTrue(live_data["evaluation"]["payout_eligible"])
+        self.assertEqual(live_data["metadata"]["sensor_model"], "MQ-135-raw")
+        self.assertFalse(live_data["metadata"]["is_certified_co2"])
+        self.assertEqual(len(live_data["readings"]), 12)
+        self.assertEqual(live_data["readings"][0]["device_id"], "esp8266-live-01")
+        self.assertEqual(live_data["readings"][0]["sequence"], 1)
+        self.assertEqual(live_data["readings"][-1]["sequence"], 12)
+        self.assertAlmostEqual(live_data["readings"][0]["lat"], 4.6144)
+        self.assertAlmostEqual(live_data["readings"][0]["lon"], -74.1106)
+
+        for flag, expected_status in [
+            ("expired=true", STATUS_BLOCKED),
+            ("tampered=true", STATUS_TAMPERED),
+            ("incomplete=true", STATUS_INCOMPLETE),
+            ("replay=true", STATUS_BLOCKED),
+        ]:
+            res = self.client.get(f"/api/scenarios/live-telemetry?{flag}")
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.json()["evaluation"]["status"], expected_status)
+
+        # Liquidación vía POST /api/settle con scenario='live_telemetry'
+        r_settle = self.client.post("/api/settle", json={"scenario": "live_telemetry"})
+        self.assertEqual(r_settle.status_code, 200)
+        settle_data = r_settle.json()
+        self.assertTrue(settle_data["settled"])
+        self.assertEqual(settle_data["evaluation"]["status"], STATUS_ELIGIBLE)
+
+        # Segundo POST /api/settle bloqueado por anti-replay
+        r_settle_replay = self.client.post("/api/settle", json={"scenario": "live_telemetry"})
+        self.assertEqual(r_settle_replay.status_code, 200)
+        self.assertFalse(r_settle_replay.json()["settled"])
+        self.assertEqual(r_settle_replay.json()["evaluation"]["status"], STATUS_BLOCKED)
+
+        # Insertar nuevas lecturas con anomalía sin recuperación -> BLOCKED
+        for idx in range(12):
+            r_bad = self.client.post(
+                "/api/telemetry",
+                headers=headers,
+                json={
+                    "device_id": "esp8266-live-01",
+                    "raw_signal": 650.0,
+                    "lat": 0.0,
+                    "lon": 0.0,
+                    "sequence": 100 + idx,
+                    "timestamp": 1764080000 + idx * 60,
+                },
+            )
+            self.assertEqual(r_bad.status_code, 200)
+
+        r_blocked = self.client.get("/api/scenarios/live-telemetry")
+        self.assertEqual(r_blocked.status_code, 200)
+        self.assertEqual(r_blocked.json()["evaluation"]["status"], STATUS_BLOCKED)
+
 
 if __name__ == "__main__":
     unittest.main()
